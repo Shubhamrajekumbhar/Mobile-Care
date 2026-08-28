@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Mobile Care - Admin Dashboard</title>
+
+    <link rel="stylesheet" href="/css/admin.css">
+</head>
+
+<body>
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar" id="sidebar">
+
+        <div class="logo">
+            <div class="logo-icon">MC</div>
+            <div>
+                <h2>Mobile Care</h2>
+                <span>Admin Panel</span>
+            </div>
+        </div>
+
+        <nav>
+
+            <button class="nav-item active" data-section="dashboard">
+                🏠 <span>Dashboard</span>
+            </button>
+
+            <button class="nav-item" data-section="customers">
+                👥 <span>Customers</span>
+            </button>
+
+            <button class="nav-item" data-section="repairs">
+                🔧 <span>Repairs</span>
+            </button>
+
+            <button class="nav-item" data-section="sales">
+                🛒 <span>Sales</span>
+            </button>
+
+            <button class="nav-item" data-section="inventory">
+                📦 <span>Inventory</span>
+            </button>
+
+            <button class="nav-item" data-section="warranty">
+                🛡️ <span>Warranty</span>
+            </button>
+
+            <button class="nav-item" data-section="onlineOrders">
+                🛍️ <span>Online Orders</span>
+            </button>
+            <button
+    class="nav-item"
+    data-section="shop"
+>
+    <span>🏪</span>
+    Shop Information
+</button>
+        </nav>
+
+        <button id="logoutBtn" class="logout">
+            🚪 Logout
+        </button>
+
+    </aside>
+
+
+    <!-- MAIN CONTENT -->
+    <main class="main">
+
+        <!-- TOP BAR -->
+        <header class="topbar">
+
+            <button id="menuBtn" class="mobile-menu">
+                ☰
+            </button>
+
+            <div>
+                <h1 id="pageTitle">Dashboard</h1>
+                <p id="pageSubtitle">
+                    Overview of your mobile repair shop
+                </p>
+            </div>
+
+            <div class="profile">
+                <span id="adminUser">Swami Samarth Mobile Shop</span>
+                <div class="avatar">A</div>
+            </div>
+
+        </header>
+
+
+        <!-- NOTIFICATION -->
+        <div id="toast" class="toast"></div>
+
+
+        <!-- ================= DASHBOARD ================= -->
+
+        <section id="dashboard" class="section active">
+
+            <div class="stats">
+
+                <div class="stat">
+                    <span>Total Repairs</span>
+                    <strong id="totalRepairs">0</strong>
+                    <small>All repair jobs</small>
+                </div>
+
+                <div class="stat">
+                    <span>In Progress</span>
+                    <strong id="inProgress">0</strong>
+                    <small>Currently being handled</small>
+                </div>
+
+                <div class="stat">
+                    <span>Ready Pickup</span>
+                    <strong id="readyPickup">0</strong>
+                    <small>Customers to notify</small>
+                </div>
+
+                <div class="stat accent">
+                    <span>Today's Sales</span>
+                    <strong id="todaysSales">₹0</strong>
+                    <small>Today's revenue</small>
+                </div>
+
+                <div class="stat online-revenue">
+    <span>Online Sale Revenue</span>
+    <strong id="onlineSaleRevenue">₹0</strong>
+    <small>Online store revenue</small>
+</div>
+                <div class="stat monthly-revenue">
+                    <span>Monthly Revenue</span>
+                    <strong id="monthlyRevenue">₹0</strong>
+                    <small>This month</small>
+                </div>
+
+            </div>
+
+
+            <div class="grid-2">
+
+                <div class="card">
+
+                    <div class="card-head">
+                        <h2>Recent Repairs</h2>
+
+                        <button class="link-btn" data-go="repairs">
+                            View All
+                        </button>
+                    </div>
+
+                    <div id="recentRepairs" class="table-wrap"></div>
+
+                </div>
+
+
+                <div class="card">
+
+                    <div class="card-head">
+                        <h2>Low Stock</h2>
+
+                        <button class="link-btn" data-go="inventory">
+                            Manage
+                        </button>
+                    </div>
+
+                    <div id="lowStock" class="table-wrap"></div>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- ================= CUSTOMERS ================= -->
+
+        <section id="customers" class="section">
+
+           <div class="section-head">
+
+    <div>
+        <h2>Customers</h2>
+        <p>
+            View and manage customer information.
+        </p>
+    </div>
+
+   
+
+
+    </div>
+
+</div>
+
+                <button class="primary" id="addCustomerBtn">
+                    + Add Customer
+                </button>
+
+            </div>
+
+
+            <div class="toolbar">
+
+                <input
+                    id="customerSearch"
+                    placeholder="Search name, email or phone..."
+                >
+
+                <button class="secondary" id="customerSearchBtn">
+                    Search
+                </button>
+<button
+    type="button"
+    class="secondary clear-warranty-btn"
+    onclick="clearWarrantySearch()"
+>
+    Clear
+</button>
+            </div>
+
+
+            <div class="card">
+
+                <div id="customersTable" class="table-wrap"></div>
+
+            </div>
+
+        </section>
+
+
+        <!-- ================= REPAIRS ================= -->
+
+        <section id="repairs" class="section">
+
+            <div class="section-head">
+
+                <div>
+                    <h2>Repairs</h2>
+                    <p>Create and manage repair jobs.</p>
+                </div>
+
+                <button class="primary" id="addRepairBtn">
+                    + Add Repair
+                </button>
+
+            </div>
+
+
+            <div class="toolbar">
+
+                <input
+                    id="repairSearch"
+                    placeholder="Search Job ID, customer or model..."
+                >
+
+                <select id="repairStatusFilter">
+
+                    <option value="">
+                        All Status
+                    </option>
+
+                    <option>
+                        Repair Request Received
+                    </option>
+
+                    <option>
+                        Diagnosis in Progress
+                    </option>
+
+                    <option>
+                        Waiting for Spare Parts
+                    </option>
+
+                    <option>
+                        Repair in Progress
+                    </option>
+
+                    <option>
+                        Quality Testing
+                    </option>
+
+                    <option>
+                        Ready for Pickup
+                    </option>
+
+                    <option>
+                        Delivered
+                    </option>
+
+                    <option>
+                        Cancelled
+                    </option>
+
+                </select>
+
+                <button class="secondary" id="repairSearchBtn">
+                    Search
+                </button>
+
+            </div>
+
+
+            <div class="card">
+
+                <div id="repairsTable" class="table-wrap"></div>
+
+            </div>
+
+        </section>
+
+
+        <!-- ================= SALES ================= -->
+
+        <section id="sales" class="section">
+
+            <div class="section-head">
+
+               <div>
+    <h2>Sales</h2>
+
+    <div class="today-sales-summary">
+        <span>
+            💵 Today Cash:
+            <strong id="todayCashTotal">₹0</strong>
+        </span>
+
+        <span>
+            💳 Today Online:
+            <strong id="todayOnlineTotal">₹0</strong>
+        </span>
+    </div>
+</div>
+
+                <button class="primary" id="addSaleBtn">
+                    + Add Sale
+                </button>
+
+            </div>
+
+
+            <div class="card">
+
+                <div id="salesTable" class="table-wrap"></div>
+
+            </div>
+
+        </section>
+
+
+        <!-- ================= INVENTORY ================= -->
+
+        <section id="inventory" class="section">
+
+            <div class="section-head">
+
+                <div>
+                    <h2>Inventory</h2>
+                    <p>Manage accessories and spare parts.</p>
+                </div>
+
+                <button class="primary" id="addInventoryBtn">
+                    + Add Item
+                </button>
+
+            </div>
+
+
+            <div class="card">
+
+                <div id="inventoryTable" class="table-wrap"></div>
+
+            </div>
+
+        </section>
+
+
+        <!-- ================= WARRANTY ================= -->
+<section id="warranty" class="section">
+
+    <div class="section-head">
+
+        <div>
+            <h2>Warranty Tracker</h2>
+            <p>
+                Track active and expired warranties.
+            </p>
+        </div>
+
+        <div class="warranty-search">
+
+            <input
+                type="text"
+                id="warrantySearchInput"
+                placeholder="Search by name or mobile number"
+            >
+
+            <button
+                type="button"
+                class="primary"
+                onclick="searchWarranty()"
+            >
+                Search
+            </button>
+
+            <button
+                type="button"
+                class="secondary"
+                onclick="clearWarrantySearch()"
+            >
+                Clear
+            </button>
+
+        </div>
+
+    </div>
+
+
+            <div class="stats mini">
+
+                <div class="stat">
+                    <span>Active</span>
+                    <strong id="wActive">0</strong>
+                </div>
+
+                <div class="stat">
+                    <span>Expiring Soon</span>
+                    <strong id="wExpiring">0</strong>
+                </div>
+
+                <div class="stat">
+                    <span>Expired</span>
+                    <strong id="wExpired">0</strong>
+                </div>
+
+            </div>
+
+
+            <div class="card">
+
+                <div id="warrantyTable" class="table-wrap"></div>
+
+            </div>
+     
+        </section>
+        <section id="onlineOrders" class="section">
+            <div class="section-head">
+                <div>
+                    <h2>Online Orders</h2>
+                    <p>Manage orders paid through the Mobile Care online store.</p>
+                </div>
+                <a class="secondary" href="/store.html" target="_blank">Open Store</a>
+            </div>
+            <div class="card">
+                <div id="onlineOrdersTable" class="table-wrap"></div>
+            </div>
+        </section>
+
+        <section
+    id="shop"
+    class="section"
+>
+
+    <div id="shopSection"></div>
+
+</section>
+    </main>
+
+
+    <!-- ================= MODAL ================= -->
+
+    <div id="modal" class="modal hidden">
+
+        <div class="modal-box">
+
+            <div class="modal-head">
+
+                <h2 id="modalTitle">
+                    Add
+                </h2>
+
+                <button id="closeModal">
+                    ×
+                </button>
+
+            </div>
+
+            <div id="modalBody"></div>
+
+        </div>
+
+    </div>
+
+
+    <!-- JAVASCRIPT -->
+    <script src="/js/admin.js"></script>
+
+</body>
+</html>

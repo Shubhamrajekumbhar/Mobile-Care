@@ -1,0 +1,456 @@
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family:
+        Inter,
+        system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        Arial,
+        sans-serif;
+
+    background: #f4f7fb;
+    color: #172033;
+}
+
+
+/* ================= HEADER ================= */
+
+.stock-header {
+    background: linear-gradient(
+        135deg,
+        #0b1425,
+        #1769e0
+    );
+
+    color: white;
+    padding: 24px 20px;
+    box-shadow: 0 5px 20px rgba(0,0,0,.12);
+}
+
+.header-content {
+    max-width: 1100px;
+    margin: auto;
+
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.back-btn {
+    width: 42px;
+    height: 42px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border-radius: 12px;
+
+    background: rgba(255,255,255,.14);
+    color: white;
+
+    text-decoration: none;
+    font-size: 24px;
+
+    transition: .2s;
+}
+
+.back-btn:hover {
+    background: rgba(255,255,255,.24);
+    transform: translateX(-2px);
+}
+
+.stock-header h1 {
+    margin: 0;
+    font-size: 26px;
+}
+
+.stock-header p {
+    margin: 4px 0 0;
+    opacity: .8;
+    font-size: 14px;
+}
+
+
+/* ================= CONTAINER ================= */
+
+.stock-container {
+    max-width: 1100px;
+    margin: auto;
+    padding: 35px 20px 60px;
+}
+
+
+/* ================= INTRO ================= */
+
+.stock-intro {
+    margin-bottom: 28px;
+}
+
+.stock-intro h2 {
+    margin: 0 0 6px;
+    font-size: 24px;
+}
+
+.stock-intro p {
+    margin: 0 0 20px;
+    color: #718096;
+}
+
+
+/* ================= SEARCH ================= */
+
+.search-box {
+    max-width: 650px;
+
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    background: white;
+
+    border: 1px solid #dbe4ef;
+    border-radius: 14px;
+
+    padding: 0 16px;
+
+    box-shadow:
+        0 5px 20px rgba(18,33,59,.06);
+
+    transition: .2s;
+}
+
+.search-box:focus-within {
+    border-color: #1769e0;
+
+    box-shadow:
+        0 0 0 3px rgba(23,105,224,.12);
+}
+
+.search-box span {
+    font-size: 18px;
+}
+
+.search-box input {
+    width: 100%;
+
+    border: none;
+    outline: none;
+
+    padding: 15px 0;
+
+    font-size: 15px;
+
+    color: #172033;
+}
+
+.search-box input::placeholder {
+    color: #94a3b8;
+}
+
+
+/* ================= GRID ================= */
+
+.stock-grid {
+    display: grid;
+
+    grid-template-columns:
+        repeat(3, minmax(0, 1fr));
+
+    gap: 18px;
+}
+
+
+/* ================= CARD ================= */
+
+.stock-card {
+    background: white;
+
+    border: 1px solid #e5eaf1;
+    border-radius: 16px;
+
+    padding: 20px;
+
+    display: flex;
+    align-items: center;
+    gap: 15px;
+
+    box-shadow:
+        0 5px 18px rgba(18,33,59,.05);
+
+    transition:
+        transform .2s,
+        box-shadow .2s,
+        border-color .2s;
+}
+
+.stock-card:hover {
+    transform: translateY(-3px);
+
+    border-color: #cbd9ec;
+
+    box-shadow:
+        0 12px 28px rgba(18,33,59,.09);
+}
+
+
+/* ================= ICON ================= */
+
+.product-icon {
+    width: 52px;
+    height: 52px;
+
+    flex-shrink: 0;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    background: #eaf2ff;
+
+    border-radius: 14px;
+
+    font-size: 25px;
+}
+
+
+/* ================= INFO ================= */
+
+.product-info {
+    min-width: 0;
+}
+
+.product-info h3 {
+    margin: 0;
+
+    font-size: 17px;
+
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.brand {
+    margin: 4px 0 10px;
+
+    color: #718096;
+
+    font-size: 13px;
+}
+
+
+/* ================= STATUS ================= */
+
+.stock-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+
+    border-radius: 50%;
+}
+
+.stock-status.available {
+    color: #16a34a;
+}
+
+.stock-status.available .status-dot {
+    background: #16a34a;
+}
+
+.stock-status.out {
+    color: #dc2626;
+}
+
+.stock-status.out .status-dot {
+    background: #dc2626;
+}
+
+
+/* ================= LOADING ================= */
+
+.loading {
+    grid-column: 1 / -1;
+
+    text-align: center;
+
+    padding: 60px 20px;
+
+    color: #718096;
+}
+
+
+/* ================= NO PRODUCTS ================= */
+
+.no-products {
+    text-align: center;
+
+    padding: 60px 20px;
+
+    color: #718096;
+}
+
+.no-icon {
+    font-size: 45px;
+    margin-bottom: 10px;
+}
+
+.no-products h3 {
+    margin: 0 0 5px;
+
+    color: #172033;
+}
+
+.no-products p {
+    margin: 0;
+}
+
+.hidden {
+    display: none;
+}
+
+
+/* ================= ERROR ================= */
+
+.error-box {
+    grid-column: 1 / -1;
+
+    text-align: center;
+
+    background: white;
+
+    border: 1px solid #fee2e2;
+
+    border-radius: 16px;
+
+    padding: 45px 20px;
+
+    color: #dc2626;
+}
+
+.error-box div {
+    font-size: 35px;
+}
+
+.error-box h3 {
+    margin: 10px 0 5px;
+}
+
+.error-box p {
+    margin: 0;
+    color: #718096;
+}
+
+
+/* ================= TABLET ================= */
+
+@media (max-width: 850px) {
+
+    .stock-grid {
+        grid-template-columns:
+            repeat(2, minmax(0, 1fr));
+    }
+
+}
+
+
+/* ================= MOBILE ================= */
+
+@media (max-width: 560px) {
+
+    .stock-header {
+        padding: 20px 15px;
+    }
+
+    .stock-header h1 {
+        font-size: 22px;
+    }
+
+    .stock-container {
+        padding: 25px 15px 45px;
+    }
+
+    .stock-intro h2 {
+        font-size: 21px;
+    }
+
+    .stock-grid {
+        grid-template-columns: 1fr;
+        gap: 13px;
+    }
+
+    .stock-card {
+        padding: 16px;
+    }
+
+}
+.product-price {
+    margin: 2px 0 10px;
+    font-size: 16px;
+    font-weight: 700;
+    color: #172033;
+}
+/* Shop Information */
+.shop-info {
+    margin: 40px auto 20px;
+    max-width: 700px;
+    padding: 28px 30px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+    text-align: center;
+}
+
+.shop-info h2 {
+    margin: 0 0 20px;
+    color: #0f172a;
+    font-size: 24px;
+    font-weight: 700;
+}
+
+.shop-info p {
+    margin: 10px 0;
+    color: #64748b;
+    font-size: 15px;
+    line-height: 1.6;
+}
+
+.shop-info a {
+    color: #0052ff;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.shop-info a:hover {
+    text-decoration: underline;
+}
+
+/* Mobile */
+@media (max-width: 600px) {
+
+    .shop-info {
+        margin: 30px 15px 20px;
+        padding: 22px 18px;
+    }
+
+    .shop-info h2 {
+        font-size: 20px;
+    }
+
+    .shop-info p {
+        font-size: 14px;
+    }
+}

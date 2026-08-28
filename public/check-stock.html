@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Check Stock | Mobile Care</title>
+    
+
+    <link rel="stylesheet" href="css/check-stock.css">
+</head>
+
+<body>
+
+    <header class="stock-header">
+        <div class="header-content">
+            <a href="/" class="back-btn">←</a>
+
+            <div>
+                <h1>📦 Check Stock</h1>
+                <p>Check product availability in our store</p>
+            </div>
+        </div>
+    </header>
+<!-- Shop Information -->
+<section class="shop-info">
+
+    <h2>🏪 Swami Samarth Mobile Shop</h2>
+
+    <p>
+        📞
+        <a href="tel:9922777092">
+            9922777092
+        </a>
+    </p>
+
+    <p>
+        ✉️
+        <a href="mailto:swamisamarthsshop@gmail.com">
+            swamisamarthsshop@gmail.com
+        </a>
+    </p>
+
+    <p>
+        📍
+        Sampanaa Homes opposite Near, AXIS ATM,
+        Swami Samarth Mobile Shop,
+        Shewalewadi, Pune
+    </p>
+
+</section>
+
+    <main class="stock-container">
+
+        <section class="stock-intro">
+            <h2>Product Availability</h2>
+
+            <p>
+                Search for a product to check its current stock.
+            </p>
+
+            <div class="search-box">
+                <span>🔎</span>
+
+                <input
+                    type="text"
+                    id="stockSearch"
+                    placeholder="Search products..."
+                    autocomplete="off"
+                >
+            </div>
+        </section>
+
+
+        <section id="stockProducts" class="stock-grid">
+
+            <div class="loading">
+                Loading products...
+            </div>
+
+        </section>
+
+
+        <div id="noProducts" class="no-products hidden">
+
+            <div class="no-icon">📦</div>
+
+            <h3>No products found</h3>
+
+            <p>
+                Try searching with a different product name.
+            </p>
+
+        </div>
+
+    </main>
+
+
+    <script>
+
+        let allProducts = [];
+
+
+        async function loadStock() {
+
+            const container =
+                document.getElementById("stockProducts");
+
+            try {
+
+                const response =
+    await fetch("/api/admin/products/availability");
+
+                if (!response.ok) {
+                    throw new Error("Failed to load stock");
+                }
+
+                allProducts = await response.json();
+
+                displayProducts(allProducts);
+
+            } catch (error) {
+
+                console.error(error);
+
+                container.innerHTML = `
+                    <div class="error-box">
+                        <div>⚠️</div>
+                        <h3>Unable to load stock</h3>
+                        <p>Please try again later.</p>
+                    </div>
+                `;
+            }
+        }
+
+
+        function displayProducts(products) {
+
+            const container =
+                document.getElementById("stockProducts");
+
+            const noProducts =
+                document.getElementById("noProducts");
+
+
+            if (!products.length) {
+
+                container.innerHTML = "";
+
+                noProducts.classList.remove("hidden");
+
+                return;
+            }
+
+
+            noProducts.classList.add("hidden");
+
+
+            container.innerHTML =
+                products.map(product => {
+
+                    const quantity =
+                        Number(product.quantity) || 0;
+
+                    const available =
+                        quantity > 0;
+
+
+                    return `
+
+                        <article class="stock-card">
+
+                            <div class="product-icon">
+                                📱
+                            </div>
+
+                            <div class="product-info">
+
+                                <h3>
+                                    ${escapeHTML(
+                                        product.product_name || "Product"
+                                    )}
+                                </h3>
+
+                                <p class="brand">
+                                    ${escapeHTML(
+                                        product.brand || "Mobile Care"
+                                    )}
+                                </p>
+                                <div class="product-price">
+    ₹${Number(product.selling_price || 0).toLocaleString("en-IN")}
+</div>
+
+                                <div class="stock-status ${
+                                    available
+                                        ? "available"
+                                        : "out"
+                                }">
+
+                                    <span class="status-dot"></span>
+
+                                    ${
+                                        available
+                                            ? `${quantity} available`
+                                            : "Out of Stock"
+                                    }
+
+                                </div>
+
+                            </div>
+
+                        </article>
+
+                    `;
+
+                }).join("");
+        }
+
+
+        document
+            .getElementById("stockSearch")
+            .addEventListener("input", function () {
+
+                const search =
+                    this.value
+                        .trim()
+                        .toLowerCase();
+
+
+                const filtered =
+                    allProducts.filter(product => {
+
+                        const name =
+                            String(
+                                product.product_name || ""
+                            ).toLowerCase();
+
+                        const brand =
+                            String(
+                                product.brand || ""
+                            ).toLowerCase();
+
+                        const type =
+                            String(
+                                product.type || ""
+                            ).toLowerCase();
+
+
+                        return (
+                            name.includes(search) ||
+                            brand.includes(search) ||
+                            type.includes(search)
+                        );
+
+                    });
+
+
+                displayProducts(filtered);
+
+            });
+
+
+        function escapeHTML(value) {
+
+            return String(value)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+
+        }
+
+
+        loadStock();
+
+    </script>
+
+</body>
+</html>

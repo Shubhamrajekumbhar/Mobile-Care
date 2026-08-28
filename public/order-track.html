@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1"
+    >
+
+    <title>Track Order - Mobile Care</title>
+
+    <link
+        rel="stylesheet"
+        href="/css/store.css"
+    >
+</head>
+
+<body>
+
+    <main class="track-page">
+
+        <div class="modal-card track-card">
+
+            <div class="track-header">
+                <span class="eyebrow">MOBILE CARE</span>
+
+                <h2>Track Online Order</h2>
+
+                <p class="muted">
+                    Enter your order number and the phone number
+                    used while placing the order.
+                </p>
+            </div>
+
+
+            <form id="track">
+
+                <label for="orderNumber">
+                    Order Number
+                </label>
+
+                <input
+                    id="orderNumber"
+                    type="text"
+                    placeholder="MC-..."
+                    autocomplete="off"
+                    required
+                >
+
+
+                <label for="phone">
+                    Phone Number
+                </label>
+
+                <input
+                    id="phone"
+                    type="tel"
+                    placeholder="Phone number used for order"
+                    inputmode="numeric"
+                    autocomplete="tel"
+                    required
+                >
+
+
+                <button
+                    type="submit"
+                    class="primary"
+                >
+                    📦 Track Order
+                </button>
+
+            </form>
+
+
+            <div id="result"></div>
+
+        </div>
+
+    </main>
+
+
+    <script>
+
+        const trackForm =
+            document.getElementById('track');
+
+        const result =
+            document.getElementById('result');
+
+
+        trackForm.onsubmit = async e => {
+
+            e.preventDefault();
+
+            const orderNumber =
+                document
+                    .getElementById('orderNumber')
+                    .value
+                    .trim();
+
+            const phone =
+                document
+                    .getElementById('phone')
+                    .value
+                    .trim();
+
+
+            if (!orderNumber || !phone) {
+                return;
+            }
+
+
+            result.innerHTML = `
+                <p class="muted track-loading">
+                    Checking your order...
+                </p>
+            `;
+
+
+            try {
+
+                const response = await fetch(
+                    '/api/public/store/orders/' +
+                    encodeURIComponent(orderNumber) +
+                    '?phone=' +
+                    encodeURIComponent(phone)
+                );
+
+
+                const data =
+                    await response.json();
+
+
+                if (!response.ok) {
+
+                    result.innerHTML = `
+                        <p class="track-error">
+                            ${escapeHtml(
+                                data.message ||
+                                'Order could not be found.'
+                            )}
+                        </p>
+                    `;
+
+                    return;
+                }
+
+
+                result.innerHTML = `
+
+                    <div class="track-result">
+
+                        <div class="track-order-number">
+                            <span>Order</span>
+                            <strong>
+                                ${escapeHtml(
+                                    data.order_number
+                                )}
+                            </strong>
+                        </div>
+
+
+                        <div class="track-row">
+                            <span>Payment</span>
+
+                            <strong>
+                                ${escapeHtml(
+                                    data.payment_status
+                                )}
+                            </strong>
+                        </div>
+
+
+                        <div class="track-row">
+                            <span>Status</span>
+
+                            <strong>
+                                ${escapeHtml(
+                                    data.order_status
+                                )}
+                            </strong>
+                        </div>
+
+
+                        <div class="track-row">
+                            <span>Total</span>
+
+                            <strong>
+                                ₹${Number(
+                                    data.total_amount || 0
+                                ).toLocaleString('en-IN')}
+                            </strong>
+                        </div>
+
+
+                        <div class="track-items">
+
+                            <h3>Products</h3>
+
+                            ${
+                                Array.isArray(data.items) &&
+                                data.items.length
+
+                                    ? data.items.map(item => `
+                                        <div class="track-item">
+
+                                            <span>
+                                                ${escapeHtml(
+                                                    item.product_name
+                                                )}
+                                            </span>
+
+                                            <strong>
+                                                × ${Number(
+                                                    item.quantity
+                                                )}
+                                            </strong>
+
+                                        </div>
+                                    `).join('')
+
+                                    : `
+                                        <p class="muted">
+                                            No products found.
+                                        </p>
+                                    `
+                            }
+
+                        </div>
+
+                    </div>
+                `;
+
+            } catch (error) {
+
+                console.error(
+                    'Order tracking error:',
+                    error
+                );
+
+                result.innerHTML = `
+                    <p class="track-error">
+                        Unable to track your order.
+                        Please try again.
+                    </p>
+                `;
+            }
+        };
+
+
+        function escapeHtml(value) {
+
+            return String(value ?? '').replace(
+                /[&<>"']/g,
+                character => ({
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#039;'
+                }[character])
+            );
+        }
+
+    </script>
+
+</body>
+
+</html>

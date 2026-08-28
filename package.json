@@ -1,0 +1,33 @@
+{
+  "name": "mobile-care-management-system",
+  "version": "1.0.0",
+  "description": "Mobile Care \u2013 Mobile Repair & Accessories Management System",
+  "main": "server/src/server.js",
+  "scripts": {
+    "start": "node server/src/server.js",
+    "dev": "nodemon server/src/server.js",
+    "seed": "node server/src/utils/seed.js"
+  },
+  "keywords": [
+    "mobile",
+    "repair",
+    "inventory",
+    "node",
+    "express",
+    "postgresql"
+  ],
+  "author": "Mobile Care",
+  "license": "MIT",
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "nodemailer": "^9.0.5",
+    "pg": "^8.12.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
+  }
+}

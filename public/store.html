@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mobile Care - Online Store</title>
+<link rel="stylesheet" href="/css/store.css">
+</head>
+<body>
+<header class="store-header">
+  <a class="brand" href="/"><span class="brand-icon">MC</span><span>Mobile Care</span></a>
+  <div class="header-actions">
+  <a href="/" class="link">Repair Services</a>
+
+  <a href="/order-track.html" class="track-btn">
+    📦 Track Order
+  </a>
+
+  <button id="cartBtn" class="cart-btn">
+    🛒 Cart <b id="cartCount">0</b>
+  </button>
+</div>
+</header>
+<main>
+ 
+  <section class="hero"><div><span class="eyebrow">MOBILE CARE ONLINE STORE</span><h1>Accessories you actually need.</h1><p>Shop genuine accessories and mobile products from Mobile Care.</p></div><div class="hero-card">💳 <strong>Online payment only</strong><small>Secure checkout powered by Razorpay</small></div></section>
+ <section id="shopInfo" class="shop-info-public">
+  <div class="shop-info-public-inner">
+    <h2 id="publicShopName">Mobile Care</h2>
+
+    <div class="shop-info-items">
+      <div>
+        <span>✉️</span>
+        <span id="publicShopEmail">—</span>
+      </div>
+
+      <div>
+        <span>📞</span>
+        <span id="publicShopContact">—</span>
+      </div>
+
+      <div>
+        <span>🕐</span>
+        <span id="publicShopTiming">—</span>
+      </div>
+
+      <div>
+        <span>📍</span>
+        <span id="publicShopAddress">—</span>
+      </div>
+    </div>
+  </div>
+</section>
+  <section class="shopbar"><input id="search" placeholder="Search products..."><select id="category"><option value="">All categories</option></select></section>
+  <section id="products" class="product-grid"></section>
+</main>
+<div id="drawer" class="drawer hidden"><div class="drawer-head"><h2>Your Cart</h2><button id="closeCart">×</button></div><div id="cartItems"></div><div class="cart-total"><span>Total</span><strong id="cartTotal">₹0</strong></div><button id="checkoutBtn" class="primary">Proceed to Checkout</button></div>
+<div id="overlay" class="overlay hidden"></div>
+<div id="checkoutModal" class="modal hidden"><div class="modal-card"><button class="modal-close" id="closeCheckout">
+  ×</button><h2>Checkout</h2><p class="muted">Online payment only. Enter delivery details.</p><form id="checkoutForm"><input name="name" placeholder="Full name" required><input name="phone" placeholder="Mobile number" required>
+    <input name="email" type="email" placeholder="Email address" required>
+   <div class="address-field">
+    <textarea
+        name="address"
+        id="deliveryAddress"
+        placeholder="Complete delivery address"
+        required
+    ></textarea>
+
+    <button
+        type="button"
+        id="useLocationBtn"
+        class="use-location-btn"
+    >
+        📍 Use My Location
+    </button>
+
+    <small id="locationStatus" class="location-status"></small>
+</div>
+    <div class="checkout-total">Total: <b id="checkoutTotal">₹0</b></div><button class="primary" type="submit">Pay Securely with Razorpay</button></form><p id="checkoutMessage" class="message"></p></div></div>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script><script src="/js/store.js"></script>
+</body></html>
