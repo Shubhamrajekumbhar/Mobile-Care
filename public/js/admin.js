@@ -361,23 +361,62 @@ async function loadShopInfo() {
                         </div>
 
 
-                        <div class="shop-field shop-full">
+                <div class="shop-field shop-full">
 
-                            <label>
-                                Shop Photo URL
-                                <span>(Optional)</span>
-                            </label>
+    <label>
+        Shop Photo
+        <span>(Optional)</span>
+    </label>
 
-                            <input
-                                type="url"
-                                name="photoUrl"
-                                placeholder="https://example.com/shop.jpg"
-                                value="${escapeHTML(
-                                    shop?.photo_url || ""
-                                )}"
-                            >
+    <input
+        id="shopPhotoFile"
+        name="photoFile"
+        type="file"
+        accept="image/*"
+    >
 
-                        </div>
+    <small>
+        Choose a shop photo from your gallery or computer.
+        Leave empty to keep the current photo.
+    </small>
+
+    <div style="margin-top:10px;">
+
+        ${
+            shop?.photo_url
+                ? `
+                    <img
+                        id="shopPhotoPreview"
+                        src="${escapeHTML(shop.photo_url)}"
+                        alt="Current Shop Photo"
+                        style="
+                            width:140px;
+                            height:100px;
+                            object-fit:cover;
+                            border-radius:10px;
+                            border:1px solid #ddd;
+                        "
+                    >
+                  `
+                : `
+                    <img
+                        id="shopPhotoPreview"
+                        alt="Shop Photo Preview"
+                        style="
+                            display:none;
+                            width:140px;
+                            height:100px;
+                            object-fit:cover;
+                            border-radius:10px;
+                            border:1px solid #ddd;
+                        "
+                    >
+                  `
+        }
+
+    </div>
+
+</div>
 
 
                     </div>
@@ -404,60 +443,123 @@ async function loadShopInfo() {
         const form =
             $("shopInfoForm");
 
+const shopPhotoFile =
+    $("shopPhotoFile");
 
-        form.onsubmit =
-            async event => {
-
-                event.preventDefault();
+const shopPhotoPreview =
+    $("shopPhotoPreview");
 
 
-                try {
+if (shopPhotoFile && shopPhotoPreview) {
 
-                    await api(
-                        "/admin/shop-info",
-                        {
-                            method: "PUT",
+    shopPhotoFile.onchange = () => {
 
-                            body: JSON.stringify({
+        const file =
+            shopPhotoFile.files[0];
 
-                                shopName:
-                                    form.shopName.value.trim(),
+        if (!file) {
+            return;
+        }
 
-                                address:
-                                    form.address.value.trim(),
+        shopPhotoPreview.src =
+            URL.createObjectURL(file);
 
-                                contactNumber:
-                                    form.contactNumber.value.trim(),
+        shopPhotoPreview.style.display =
+            "block";
+    };
 
-                                email:
-                                    form.email.value.trim(),
+}
+form.onsubmit =
+    async event => {
 
-                                shopTiming:
-                                    form.shopTiming.value.trim(),
+        event.preventDefault();
 
-                                photoUrl:
-                                    form.photoUrl.value.trim()
+        try {
 
-                            })
-                        }
+            const photoFile =
+                form.photoFile.files[0];
+
+            /*
+             * Keep the existing shop photo
+             * if no new photo is selected.
+             */
+            let photoUrl =
+                shop?.photo_url || "";
+
+
+            /*
+             * If admin selected a new photo,
+             * convert it to a compressed image.
+             */
+            if (photoFile) {
+
+                photoUrl =
+                    await imageFileToDataURL(
+                        photoFile
                     );
 
-
-                    toast(
-                        "Shop information saved successfully."
-                    );
+            }
 
 
-                } catch (error) {
+            await api(
+                "/admin/shop-info",
+                {
+                    method: "PUT",
 
-                    toast(
-                        error.message,
-                        true
-                    );
+                    body: JSON.stringify({
 
+                        shopName:
+                            form.shopName.value.trim(),
+
+                        address:
+                            form.address.value.trim(),
+
+                        contactNumber:
+                            form.contactNumber.value.trim(),
+
+                        email:
+                            form.email.value.trim(),
+
+                        shopTiming:
+                            form.shopTiming.value.trim(),
+
+                        photoUrl:
+                            photoUrl
+
+                    })
                 }
+            );
 
-            };
+
+            toast(
+                "Shop information saved successfully."
+            );
+
+
+            /*
+             * Reload shop information so the
+             * new image appears immediately.
+             */
+            await loadShopInfo();
+
+
+        } catch (error) {
+
+            console.error(
+                "Shop info save error:",
+                error
+            );
+
+            toast(
+                error.message ||
+                "Failed to save shop information.",
+                true
+            );
+
+        }
+
+    };
+        
 
     } catch (error) {
 
@@ -1669,7 +1771,7 @@ const email = emailInput ? emailInput.value.trim() : "";
                                     button.dataset.customerPhone;
 
                                 const email =
-                                    button.dataset.customerEmail;
+                                 button.dataset.email || "";
 
                                 selected.style.display =
                                     "block";
@@ -2191,6 +2293,61 @@ async function deleteInventory(id) {
         );
     }
 }
+
+async function imageFileToDataURL(file) {
+    if (!file) return "";
+
+    if (!file.type.startsWith("image/")) {
+        throw new Error("Please select a valid image file.");
+    }
+
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+
+        reader.onload = () => {
+            const img = new Image();
+
+            img.onload = () => {
+                const MAX_SIZE = 1000;
+
+                let width = img.width;
+                let height = img.height;
+
+                if (width > height && width > MAX_SIZE) {
+                    height = Math.round(height * MAX_SIZE / width);
+                    width = MAX_SIZE;
+                } else if (height > MAX_SIZE) {
+                    width = Math.round(width * MAX_SIZE / height);
+                    height = MAX_SIZE;
+                }
+
+                const canvas = document.createElement("canvas");
+                canvas.width = width;
+                canvas.height = height;
+
+                const ctx = canvas.getContext("2d");
+                ctx.drawImage(img, 0, 0, width, height);
+
+                resolve(
+                    canvas.toDataURL("image/jpeg", 0.80)
+                );
+            };
+
+            img.onerror = () => {
+                reject(new Error("Unable to read the selected image."));
+            };
+
+            img.src = reader.result;
+        };
+
+        reader.onerror = () => {
+            reject(new Error("Unable to read the image file."));
+        };
+
+        reader.readAsDataURL(file);
+    });
+}
+
 function editInventory(item) {
 
     $("modalBody").innerHTML = `
@@ -2253,12 +2410,62 @@ function editInventory(item) {
                         value="${Number(item.minimum_stock_level || 0)}"
                     >
                 </div>
+<div class="field">
 
-                <div class="field">
-                    <label>Product Image URL</label>
-                    <input name="imageUrl" value="${escapeHTML(item.image_url || "")}" placeholder="https://...">
-                </div>
+    <label for="editImageFile">
+        Product Image
+    </label>
 
+    <input
+        id="editImageFile"
+        name="imageFile"
+        type="file"
+        accept="image/*"
+    >
+
+    <small>
+        Select a new image from your phone or computer.
+        Leave empty to keep the current image.
+    </small>
+
+    <div style="margin-top:10px;">
+
+        ${
+            item.image_url
+                ? `
+                    <img
+                        id="editImagePreview"
+                        src="${escapeHTML(item.image_url)}"
+                        alt="Current Product Image"
+                        style="
+                            width:120px;
+                            height:120px;
+                            object-fit:cover;
+                            border-radius:10px;
+                            border:1px solid #ddd;
+                        "
+                    >
+                  `
+                : `
+                    <img
+                        id="editImagePreview"
+                        alt="Product Image Preview"
+                        style="
+                            display:none;
+                            width:120px;
+                            height:120px;
+                            object-fit:cover;
+                            border-radius:10px;
+                            border:1px solid #ddd;
+                        "
+                    >
+                  `
+        }
+
+    </div>
+
+</div>
+           
                 <div class="instagram-product-field">
                     <label>Instagram Post URL</label>
                     <input name="instagramUrl" value="${escapeHTML(item.instagram_url || "")}" placeholder="https://instagram.com/...">
@@ -2317,6 +2524,30 @@ function editInventory(item) {
     `;
 
     $("modal").classList.remove("hidden");
+    const editImageFile =
+    $("editImageFile");
+
+const editImagePreview =
+    $("editImagePreview");
+
+if (editImageFile && editImagePreview) {
+
+    editImageFile.onchange = () => {
+
+        const file =
+            editImageFile.files[0];
+
+        if (!file) {
+            return;
+        }
+
+        editImagePreview.src =
+            URL.createObjectURL(file);
+
+        editImagePreview.style.display =
+            "block";
+    };
+}
 
     $("editInventoryForm").onsubmit =
         async function (event) {
@@ -2325,36 +2556,56 @@ function editInventory(item) {
 
             const form = event.target;
 
-            const data = {
+           const imageFile =
+    form.imageFile.files[0];
 
-                productName:
-                    form.productName.value.trim(),
+let imageUrl =
+    item.image_url || "";
 
-                category:
-                    form.category.value.trim(),
+if (imageFile) {
 
-                brand:
-                    form.brand.value.trim(),
+    imageUrl =
+        await imageFileToDataURL(imageFile);
+}
 
-                modelCompatibility:
-                    form.modelCompatibility.value.trim(),
 
-                quantity:
-                    Number(form.quantity.value || 0),
+const data = {
 
-                purchasePrice:
-                    Number(form.purchasePrice.value || 0),
+    productName:
+        form.productName.value.trim(),
 
-                sellingPrice:
-                    Number(form.sellingPrice.value || 0),
+    category:
+        form.category.value.trim(),
 
-                minimumStockLevel:
-                    Number(form.minimumStockLevel.value || 0),
+    brand:
+        form.brand.value.trim(),
 
-                imageUrl: form.imageUrl.value.trim(),
-                instagramUrl: form.instagramUrl.value.trim(),
-                onlineEnabled: form.onlineEnabled.checked
-            };
+    modelCompatibility:
+        form.modelCompatibility.value.trim(),
+
+    quantity:
+        Number(form.quantity.value || 0),
+
+    purchasePrice:
+        Number(form.purchasePrice.value || 0),
+
+    sellingPrice:
+        Number(form.sellingPrice.value || 0),
+
+    minimumStockLevel:
+        Number(
+            form.minimumStockLevel.value || 0
+        ),
+
+    imageUrl:
+        imageUrl,
+
+    instagramUrl:
+        form.instagramUrl.value.trim(),
+
+    onlineEnabled:
+        form.onlineEnabled.checked
+};
 
             try {
 
@@ -2415,69 +2666,37 @@ function inventoryForm() {
                     "brand"
                 )}
 
-                <div class="form-field">
+               <div class="form-field">
 
-                    <label for="category">
-                        Type
-                    </label>
+    <label for="category">
+        Type
+    </label>
 
-                    <select
-                        id="category"
-                        name="category"
-                        required
-                    >
+    <select
+        id="category"
+        name="category"
+        required
+    >
 
-                        <option value="">
-                            Select Type
-                        </option>
+        <option value="">
+            Select Type
+        </option>
 
-                        <option value="Cable">
-                            Cable
-                        </option>
+        <option value="Mobile Accessories">
+            Mobile Accessories
+        </option>
 
-                        <option value="Charger">
-                            Charger
-                        </option>
+        <option value="Laptop Accessories">
+            Laptop Accessories
+        </option>
 
-                        <option value="Adapter">
-                            Adapter
-                        </option>
+        <option value="Other">
+            Other
+        </option>
 
-                        <option value="Earphones">
-                            Earphones
-                        </option>
+    </select>
 
-                        <option value="Power Bank">
-                            Power Bank
-                        </option>
-
-                        <option value="Mobile Cover">
-                            Mobile Cover
-                        </option>
-
-                        <option value="Screen Protector">
-                            Screen Protector
-                        </option>
-
-                        <option value="Mobile Part">
-                            Mobile Part
-                        </option>
-
-                        <option value="iPhone">
-                            iPhone
-                        </option>
-
-                        <option value="Android">
-                            Android
-                        </option>
-
-                        <option value="Other">
-                            Other
-                        </option>
-
-                    </select>
-
-                </div>
+</div>
 
 
                 ${field(
@@ -2502,9 +2721,31 @@ function inventoryForm() {
                 )}
 
                 <div class="form-field">
-                    <label for="imageUrl">Product Image URL</label>
-                    <input id="imageUrl" name="imageUrl" type="url" placeholder="https://example.com/product.jpg">
-                </div>
+    <label for="imageFile">Product Image</label>
+
+    <input
+        id="imageFile"
+        name="imageFile"
+        type="file"
+        accept="image/*"
+    >
+
+    <small>
+        Select an image from your phone or computer.
+    </small>
+
+    <img
+        id="imagePreview"
+        style="
+            display:none;
+            max-width:180px;
+            margin-top:10px;
+            border-radius:8px;
+        "
+        alt="Product image preview"
+    >
+    $("modal").classList.remove("hidden");
+</div>
 
                 <div class="form-field">
                     <label for="instagramUrl">Instagram Post URL</label>
@@ -2540,53 +2781,104 @@ function inventoryForm() {
         `
     );
 
-
     $("inventoryForm").onsubmit =
-        async event => {
+    async event => {
 
-            event.preventDefault();
+        event.preventDefault();
 
+        const form = event.currentTarget;
 
-            const data = Object.fromEntries(new FormData(event.currentTarget));
-            data.onlineEnabled = event.currentTarget.onlineEnabled.checked;
+        try {
 
+            const imageFile =
+                form.imageFile.files[0];
 
-            try {
+            let imageUrl = "";
 
-                await api(
-                    "/admin/inventory",
-                    {
-                        method: "POST",
-
-                        body:
-                            JSON.stringify(data)
-                    }
-                );
-
-
-                closeModal();
-
-
-                toast(
-                    "Inventory item added"
-                );
-
-
-                loadInventory();
-
-                loadDashboard();
-
-
-            } catch (error) {
-
-                toast(
-                    error.message,
-                    true
-                );
-
+            if (imageFile) {
+                imageUrl =
+                    await imageFileToDataURL(imageFile);
             }
 
-        };
+            const data = {
+
+                productName:
+                    form.productName.value.trim(),
+
+                brand:
+                    form.brand.value.trim(),
+
+                category:
+                    form.category.value.trim(),
+
+                modelCompatibility:
+                    form.modelCompatibility
+                        ? form.modelCompatibility.value.trim()
+                        : "",
+
+                quantity:
+                    Number(form.quantity.value || 0),
+
+                purchasePrice:
+                    Number(form.purchasePrice.value || 0),
+
+                sellingPrice:
+                    Number(form.sellingPrice.value || 0),
+
+                minimumStockLevel:
+                    form.minimumStockLevel
+                        ? Number(
+                            form.minimumStockLevel.value || 0
+                        )
+                        : 5,
+
+                imageUrl: imageUrl,
+
+                instagramUrl:
+                    form.instagramUrl.value.trim(),
+
+                onlineEnabled:
+                    form.onlineEnabled.checked
+            };
+
+
+            await api(
+                "/admin/inventory",
+                {
+                    method: "POST",
+
+                    body:
+                        JSON.stringify(data)
+                }
+            );
+
+
+            closeModal();
+
+
+            toast(
+                "Inventory item added"
+            );
+
+
+            await loadInventory();
+
+
+        } catch (error) {
+
+            console.error(
+                "Add inventory error:",
+                error
+            );
+
+            toast(
+                error.message ||
+                "Failed to add inventory item.",
+                true
+            );
+        }
+    };
+
 
 
     $("cancelModal").onclick =
@@ -2864,7 +3156,11 @@ async function saleForm() {
                             id="selectedCustomerName"
                             name="customerName"
                         >
-
+<input
+    type="hidden"
+    id="selectedCustomerEmail"
+    name="customerEmail"
+>
                     </div>
 
 
@@ -2890,6 +3186,12 @@ async function saleForm() {
 ${field(
     "Phone",
     "newCustomerPhone"
+)}
+
+${field(
+    "Email",
+    "newCustomerEmail",
+    "email"
 )}
 
                         </div>
@@ -3059,13 +3361,30 @@ $("addCustomerFromSale").onclick =
         const phone =
             form.newCustomerPhone.value.trim();
 
-        if (!name || !phone) {
-            toast(
-                "Customer name and phone are required.",
-                true
-            );
-            return;
-        }
+        const email =
+            form.newCustomerEmail.value.trim();
+
+       const warrantyMonths =
+    Number($("warrantyMonths").value || 0);
+
+if (!name || !phone) {
+    toast(
+        "Customer name and phone are required.",
+        true
+    );
+    return;
+}
+
+if (
+    (warrantyMonths === 3 || warrantyMonths === 6) &&
+    !email
+) {
+    toast(
+        "Customer email is required for warranty products.",
+        true
+    );
+    return;
+}
 
         try {
             const customer =
@@ -3076,7 +3395,7 @@ $("addCustomerFromSale").onclick =
                         body: JSON.stringify({
                             name,
                             phone,
-                            email: "",
+                            email,
                             address: ""
                         })
                     }
@@ -3087,6 +3406,9 @@ $("addCustomerFromSale").onclick =
 
             $("selectedCustomerName").value =
                 customer.name;
+
+            $("selectedCustomerEmail").value =
+                customer.email || email || "";
 
             $("selectedCustomer").style.display =
                 "block";
@@ -3245,6 +3567,7 @@ productSearch.addEventListener('input', () => {
                                         class="customer-result"
                                         data-id="${customer.id}"
                                         data-name="${escapeHTML(customer.name)}"
+                                        data-email="${escapeHTML(customer.email || "")}"
                                         style="
                                             display:block;
                                             width:100%;
@@ -3266,11 +3589,11 @@ productSearch.addEventListener('input', () => {
                                         <br>
 
                                         <small>
-                                            ${escapeHTML(
-                                                customer.phone
-                                            )}
+                                            ${escapeHTML(customer.phone || "")}
+                                            ${customer.email
+                                                ? " • " + escapeHTML(customer.email)
+                                                : ""}
                                         </small>
-
                                     </button>
 
                                 `).join("")}
@@ -3293,6 +3616,8 @@ productSearch.addEventListener('input', () => {
                                     const name =
                                         button.dataset.name;
 
+                                    const email =
+                                        button.dataset.email || "";
 
                                     $("selectedCustomerId")
                                         .value = id;
@@ -3300,6 +3625,8 @@ productSearch.addEventListener('input', () => {
                                     $("selectedCustomerName")
                                         .value = name;
 
+                                    $("selectedCustomerEmail")
+                                        .value = email;
 
                                     customerSearch.value =
                                         "";
@@ -3440,8 +3767,25 @@ updateTotal();
     const customerName =
         $("selectedCustomerName").value;
 
+    const customerEmail =
+        $("selectedCustomerEmail").value.trim();
+
+    const warrantyMonths =
+        Number($("warrantyMonths").value || 0);
+
     if (!customerId) {
         toast("Please select a customer.", true);
+        return;
+    }
+
+    if (
+        (warrantyMonths === 3 || warrantyMonths === 6) &&
+        !customerEmail
+    ) {
+        toast(
+            "Customer email is required for warranty products.",
+            true
+        );
         return;
     }
 
@@ -3453,12 +3797,13 @@ updateTotal();
     customerId: customerId,
 
     customerName: customerName,
+    customerEmail: customerEmail,
 
     discount:
         Number(form.discount.value || 0),
 
     warrantyMonths:
-        Number($("warrantyMonths").value || 0),
+        warrantyMonths,
 
     paymentMethod:
         $("paymentMethod").value,

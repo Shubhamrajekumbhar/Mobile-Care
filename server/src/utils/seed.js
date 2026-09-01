@@ -4,9 +4,9 @@ const { pool } = require('../config/db');
 
 async function createDefaultAdmin() {
   try {
-    const email = process.env.ADMIN_DEFAULT_EMAIL || 'admin@mobilecare.com';
-    const username = process.env.ADMIN_DEFAULT_USERNAME || 'admin';
-    const password = process.env.ADMIN_DEFAULT_PASSWORD || 'admin123';
+    const email = process.env.ADMIN_DEFAULT_EMAIL || 'swamisamarthsshop@gmail.com';
+    const username = process.env.ADMIN_DEFAULT_USERNAME || 'sagar raje';
+    const password = process.env.ADMIN_DEFAULT_PASSWORD || 'swamisamarth@9922';
 
     const existing = await pool.query('SELECT id FROM admins WHERE email = $1 OR username = $2', [email, username]);
 

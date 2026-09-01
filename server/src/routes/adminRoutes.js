@@ -1194,7 +1194,7 @@ router.post('/sales', authenticateAdmin, async (req, res) => {
     discount = 0,
     warrantyMonths = 0,
     paymentMethod = 'Cash'
-} = req.body;
+  } = req.body;
 
   if (!items || items.length === 0) {
     return res.status(400).json({
@@ -1202,7 +1202,73 @@ router.post('/sales', authenticateAdmin, async (req, res) => {
     });
   }
 
+  const warrantyDuration = Number(warrantyMonths || 0);
+
+  if (
+    warrantyDuration !== 0 &&
+    warrantyDuration !== 3 &&
+    warrantyDuration !== 6
+  ) {
+    return res.status(400).json({
+      message: 'Warranty can only be 0, 3 or 6 months.'
+    });
+  }
+
   try {
+
+    /* =========================================
+       GET CUSTOMER
+    ========================================= */
+
+    let customer = null;
+
+    if (customerId) {
+
+      const customerResult = await pool.query(
+        `SELECT id, name, phone, email, address
+         FROM customers
+         WHERE id = $1`,
+        [customerId]
+      );
+
+      if (customerResult.rowCount === 0) {
+        return res.status(404).json({
+          message: 'Selected customer was not found.'
+        });
+      }
+
+      customer = customerResult.rows[0];
+
+    }
+
+    const customerEmail =
+      String(customer?.email || '').trim();
+
+    const finalCustomerName =
+      customer?.name ||
+      customerName ||
+      'Customer';
+
+
+    /* =========================================
+       WARRANTY EMAIL VALIDATION
+    ========================================= */
+
+    if (
+      (warrantyDuration === 3 ||
+       warrantyDuration === 6) &&
+      !customerEmail
+    ) {
+      return res.status(400).json({
+        message:
+          'Customer email is required for warranty products.'
+      });
+    }
+
+
+    /* =========================================
+       CALCULATE TOTAL
+    ========================================= */
 
     const subtotal = items.reduce(
       (sum, item) =>
@@ -1214,62 +1280,105 @@ router.post('/sales', authenticateAdmin, async (req, res) => {
       Number(discount || 0);
 
     const saleTotal =
-      Math.max(0, subtotal - discountAmount);
+      Math.max(
+        0,
+        subtotal - discountAmount
+      );
 
+
+    /* =========================================
+       CREATE SALE
+    ========================================= */
 
     const saleResult = await pool.query(
       `INSERT INTO sales
-       (customer_id, customer_name, total_amount, discount, payment_method, sale_date)
+       (
+         customer_id,
+         customer_name,
+         total_amount,
+         discount,
+         payment_method,
+         sale_date
+       )
        VALUES ($1, $2, $3, $4, $5, NOW())
        RETURNING *`,
       [
         customerId || null,
-        customerName || '',
+        finalCustomerName,
         saleTotal,
         discountAmount,
         paymentMethod
       ]
     );
 
-
     const sale = saleResult.rows[0];
-    if (Number(warrantyMonths) === 3 || Number(warrantyMonths) === 6) {
 
-    const warrantyStart = new Date();
 
-    const warrantyEnd = new Date(warrantyStart);
+    /* =========================================
+       CREATE WARRANTY
+    ========================================= */
 
-    warrantyEnd.setMonth(
-        warrantyEnd.getMonth() + Number(warrantyMonths)
-    );
+    let warranty = null;
 
-    await pool.query(
-        `INSERT INTO warranties
-        (
-            sale_id,
-            customer_id,
-            warranty_start_date,
-            warranty_end_date,
-            duration_days,
-            status
-        )
-        VALUES ($1, $2, $3, $4, $5, 'Active')`,
-        [
+    if (
+      warrantyDuration === 3 ||
+      warrantyDuration === 6
+    ) {
+
+      const warrantyStart =
+        new Date();
+
+      const warrantyEnd =
+        new Date(warrantyStart);
+
+      warrantyEnd.setMonth(
+        warrantyEnd.getMonth() +
+        warrantyDuration
+      );
+
+      const warrantyResult =
+        await pool.query(
+          `INSERT INTO warranties
+           (
+             sale_id,
+             customer_id,
+             warranty_start_date,
+             warranty_end_date,
+             duration_days,
+             status
+           )
+           VALUES ($1, $2, $3, $4, $5, 'Active')
+           RETURNING *`,
+          [
             sale.id,
             customerId || null,
             warrantyStart,
             warrantyEnd,
-            Number(warrantyMonths) * 30
-        ]
-    );
-}
+            warrantyDuration * 30
+          ]
+        );
 
+      warranty =
+        warrantyResult.rows[0];
+    }
+
+
+    /* =========================================
+       SALE ITEMS + STOCK UPDATE
+    ========================================= */
 
     for (const item of items) {
 
       await pool.query(
         `INSERT INTO sale_items
-         (sale_id, product_id, product_name, quantity, unit_price, total_price)
+         (
+           sale_id,
+           product_id,
+           product_name,
+           quantity,
+           unit_price,
+           total_price
+         )
          VALUES ($1, $2, $3, $4, $5, $6)`,
         [
           sale.id,
@@ -1296,7 +1405,528 @@ router.post('/sales', authenticateAdmin, async (req, res) => {
     }
 
 
-    res.status(201).json(sale);
+    /* =========================================
+       SEND WARRANTY INVOICE EMAIL
+       ONLY FOR WARRANTY SALES
+    ========================================= */
+
+    if (
+      warranty &&
+      customerEmail
+    ) {
+
+      try {
+
+        /* -----------------------------------------
+           SHOP INFO
+        ----------------------------------------- */
+
+        const shopResult =
+          await pool.query(
+            `SELECT
+               shop_name,
+               address,
+               contact_number,
+               email,
+               shop_timing
+             FROM shop_info
+             ORDER BY id
+             LIMIT 1`
+          );
+
+        const shop =
+          shopResult.rows[0] || {};
+
+        const shopName =
+          shop.shop_name ||
+          'Mobile Care';
+
+        const shopAddress =
+          shop.address || '';
+
+        const shopContact =
+          shop.contact_number || '';
+
+        const shopEmail =
+          shop.email || '';
+
+        const shopTiming =
+          shop.shop_timing || '';
+
+
+        /* -----------------------------------------
+           FORMAT ITEMS
+        ----------------------------------------- */
+
+        const itemRows =
+          items.map(item => {
+
+            const quantity =
+              Number(item.quantity || 0);
+
+            const unitPrice =
+              Number(item.unitPrice || 0);
+
+            const totalPrice =
+              Number(item.totalPrice || 0);
+
+            return `
+              <tr>
+                <td style="
+                  padding:12px;
+                  border-bottom:1px solid #e5e7eb;
+                ">
+                  ${item.productName || 'Product'}
+                </td>
+
+                <td style="
+                  padding:12px;
+                  text-align:center;
+                  border-bottom:1px solid #e5e7eb;
+                ">
+                  ${quantity}
+                </td>
+
+                <td style="
+                  padding:12px;
+                  text-align:right;
+                  border-bottom:1px solid #e5e7eb;
+                ">
+                  ₹${unitPrice.toFixed(2)}
+                </td>
+
+                <td style="
+                  padding:12px;
+                  text-align:right;
+                  border-bottom:1px solid #e5e7eb;
+                ">
+                  ₹${totalPrice.toFixed(2)}
+                </td>
+              </tr>
+            `;
+          }).join('');
+
+
+        /* -----------------------------------------
+           WARRANTY DATES
+        ----------------------------------------- */
+
+        const warrantyStart =
+          new Date(
+            warranty.warranty_start_date
+          );
+
+        const warrantyEnd =
+          new Date(
+            warranty.warranty_end_date
+          );
+
+        const formatDate =
+          date =>
+            date.toLocaleDateString(
+              'en-IN',
+              {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric'
+              }
+            );
+
+
+        const invoiceNumber =
+          `SALE-${sale.id}`;
+
+
+        /* -----------------------------------------
+           EMAIL
+        ----------------------------------------- */
+
+        await sendEmail({
+
+          to: customerEmail,
+
+          subject:
+            `${shopName} - Invoice ${invoiceNumber} & Warranty Details`,
+
+          text: `
+${shopName}
+
+Hello ${finalCustomerName},
+
+Thank you for your purchase.
+
+INVOICE
+--------------------------------
+Invoice Number: ${invoiceNumber}
+Sale Date: ${new Date(
+  sale.sale_date
+).toLocaleDateString('en-IN')}
+
+${items.map(item =>
+`${item.productName}
+Quantity: ${Number(item.quantity || 0)}
+Unit Price: ₹${Number(item.unitPrice || 0).toFixed(2)}
+Total: ₹${Number(item.totalPrice || 0).toFixed(2)}
+`
+).join('\n')}
+
+Subtotal: ₹${subtotal.toFixed(2)}
+Discount: ₹${discountAmount.toFixed(2)}
+Grand Total: ₹${saleTotal.toFixed(2)}
+Payment Method: ${paymentMethod}
+
+WARRANTY
+--------------------------------
+Duration: ${warrantyDuration} months
+Warranty Start: ${formatDate(warrantyStart)}
+Warranty End: ${formatDate(warrantyEnd)}
+Status: Active
+
+Thank you for choosing ${shopName}.
+
+${shopName}
+${shopAddress}
+Phone: ${shopContact}
+Email: ${shopEmail}
+Opening Hours: ${shopTiming}
+`,
+
+          html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+</head>
+
+<body style="
+  margin:0;
+  padding:0;
+  background:#f3f7fc;
+  font-family:Arial,Helvetica,sans-serif;
+  color:#0f172a;
+">
+
+<table width="100%"
+       cellpadding="0"
+       cellspacing="0"
+       style="padding:30px 10px;">
+
+<tr>
+<td align="center">
+
+<table width="100%"
+       cellpadding="0"
+       cellspacing="0"
+       style="
+         max-width:650px;
+         background:#ffffff;
+         border-radius:16px;
+         overflow:hidden;
+         border:1px solid #e2e8f0;
+       ">
+
+<!-- HEADER -->
+
+<tr>
+<td style="
+  background:#1769e0;
+  color:#ffffff;
+  padding:25px;
+  text-align:center;
+">
+
+<h2 style="margin:0;">
+  ${shopName}
+</h2>
+
+<p style="
+  margin:8px 0 0;
+  color:#dbeafe;
+">
+  Invoice & Warranty Details
+</p>
+
+</td>
+</tr>
+
+
+<!-- CONTENT -->
+
+<tr>
+<td style="padding:30px;">
+
+<h2>
+  Thank you for your purchase! 🎉
+</h2>
+
+<p>
+  Hello <strong>${finalCustomerName}</strong>,
+</p>
+
+<p style="color:#64748b;">
+  Here are your purchase and warranty details.
+</p>
+
+
+<!-- INVOICE -->
+
+<div style="
+  margin-top:25px;
+  padding:20px;
+  background:#f8fbff;
+  border:1px solid #dbe7f5;
+  border-radius:12px;
+">
+
+<h3 style="
+  margin-top:0;
+  color:#1769e0;
+">
+  Invoice
+</h3>
+
+<p>
+  <strong>Invoice Number:</strong>
+  ${invoiceNumber}
+</p>
+
+<p>
+  <strong>Date:</strong>
+  ${new Date(
+    sale.sale_date
+  ).toLocaleDateString('en-IN')}
+</p>
+
+<table width="100%"
+       cellpadding="0"
+       cellspacing="0"
+       style="
+         border-collapse:collapse;
+         margin-top:15px;
+       ">
+
+<thead>
+
+<tr style="
+  background:#eef5ff;
+">
+
+<th style="
+  padding:12px;
+  text-align:left;
+">
+  Product
+</th>
+
+<th style="
+  padding:12px;
+  text-align:center;
+">
+  Qty
+</th>
+
+<th style="
+  padding:12px;
+  text-align:right;
+">
+  Price
+</th>
+
+<th style="
+  padding:12px;
+  text-align:right;
+">
+  Total
+</th>
+
+</tr>
+
+</thead>
+
+<tbody>
+
+${itemRows}
+
+</tbody>
+
+</table>
+
+
+<div style="
+  margin-top:20px;
+  text-align:right;
+  line-height:1.8;
+">
+
+<div>
+  Subtotal:
+  <strong>
+    ₹${subtotal.toFixed(2)}
+  </strong>
+</div>
+
+<div>
+  Discount:
+  <strong>
+    ₹${discountAmount.toFixed(2)}
+  </strong>
+</div>
+
+<div style="
+  font-size:18px;
+  color:#1769e0;
+">
+
+Grand Total:
+<strong>
+  ₹${saleTotal.toFixed(2)}
+</strong>
+
+</div>
+
+<div>
+  Payment:
+  <strong>
+    ${paymentMethod}
+  </strong>
+</div>
+
+</div>
+
+</div>
+
+
+<!-- WARRANTY -->
+
+<div style="
+  margin-top:20px;
+  padding:20px;
+  background:#f0fdf4;
+  border:1px solid #bbf7d0;
+  border-radius:12px;
+">
+
+<h3 style="
+  margin-top:0;
+  color:#15803d;
+">
+  Warranty Details 🛡️
+</h3>
+
+<p>
+  <strong>Duration:</strong>
+  ${warrantyDuration} months
+</p>
+
+<p>
+  <strong>Start Date:</strong>
+  ${formatDate(warrantyStart)}
+</p>
+
+<p>
+  <strong>End Date:</strong>
+  ${formatDate(warrantyEnd)}
+</p>
+
+<p>
+  <strong>Status:</strong>
+  Active
+</p>
+
+</div>
+
+
+<p style="
+  margin-top:25px;
+  color:#64748b;
+">
+
+Please keep this email for your records
+and warranty reference.
+
+</p>
+
+</td>
+</tr>
+
+
+<!-- FOOTER -->
+
+<tr>
+<td style="
+  background:#f8fafc;
+  padding:22px;
+  text-align:center;
+  color:#64748b;
+  font-size:12px;
+">
+
+<strong style="color:#1769e0;">
+  ${shopName}
+</strong>
+
+<br><br>
+
+${shopAddress}
+
+<br>
+
+📞 ${shopContact}
+
+<br>
+
+✉ ${shopEmail}
+
+<br>
+
+🕐 ${shopTiming}
+
+<br><br>
+
+Thank you for choosing ${shopName} ❤️
+
+</td>
+</tr>
+
+</table>
+
+</td>
+</tr>
+
+</table>
+
+</body>
+</html>
+`
+
+        });
+
+        console.log(
+          `Warranty invoice email sent to ${customerEmail}`
+        );
+
+      } catch (emailError) {
+
+        console.error(
+          'Warranty invoice email failed:',
+          emailError
+        );
+
+        // IMPORTANT:
+        // Sale remains successful even if email fails.
+      }
+    }
+
+
+    /* =========================================
+       RETURN SALE
+    ========================================= */
+
+    res.status(201).json({
+      ...sale,
+      warranty
+    });
+
 
   } catch (error) {
 
@@ -1306,80 +1936,13 @@ router.post('/sales', authenticateAdmin, async (req, res) => {
     );
 
     res.status(500).json({
-      message: 'Failed to create sale record.'
+      message:
+        'Failed to create sale record.'
     });
 
   }
 
 });
-// DELETE SALE
-router.delete('/sales/:id', authenticateAdmin, async (req, res) => {
-  const { id } = req.params;
-
-  try {
-    await pool.query('BEGIN');
-
-    // Get all items belonging to this sale
-    const saleItems = await pool.query(
-      `SELECT product_id, quantity
-       FROM sale_items
-       WHERE sale_id = $1`,
-      [id]
-    );
-
-    // Restore inventory quantities
-    for (const item of saleItems.rows) {
-      if (item.product_id) {
-        await pool.query(
-          `UPDATE inventory
-           SET quantity = quantity + $1,
-               updated_at = NOW()
-           WHERE id = $2`,
-          [
-            Number(item.quantity || 0),
-            item.product_id
-          ]
-        );
-      }
-    }
-
-    // Delete sale items first
-    await pool.query(
-      'DELETE FROM sale_items WHERE sale_id = $1',
-      [id]
-    );
-
-    // Delete sale
-    const result = await pool.query(
-      'DELETE FROM sales WHERE id = $1 RETURNING *',
-      [id]
-    );
-
-    if (result.rowCount === 0) {
-      await pool.query('ROLLBACK');
-
-      return res.status(404).json({
-        message: 'Sale not found.'
-      });
-    }
-
-    await pool.query('COMMIT');
-
-    res.json({
-      message: 'Sale deleted successfully.'
-    });
-
-  } catch (error) {
-    await pool.query('ROLLBACK');
-
-    console.error('Delete sale error:', error);
-
-    res.status(500).json({
-      message: 'Failed to delete sale.'
-    });
-  }
-});
-
 
 router.get('/online-orders', authenticateAdmin, async (req, res) => {
   try {
