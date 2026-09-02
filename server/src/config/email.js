@@ -21,6 +21,7 @@ const transporter = nodemailer.createTransport({
 // GENERAL EMAIL FUNCTION
 // =====================================================
 
+
 const sendEmail = async ({
   to,
   subject,
@@ -29,35 +30,42 @@ const sendEmail = async ({
   repairId
 }) => {
 
+  console.log('📧 Attempting to send email...');
+  console.log('To:', to);
+  console.log('SMTP HOST:', process.env.SMTP_HOST);
+  console.log('SMTP PORT:', process.env.SMTP_PORT);
+  console.log('SMTP USER:', process.env.SMTP_USER);
+  console.log(
+    'SMTP PASS:',
+    process.env.SMTP_PASS ? `SET (${process.env.SMTP_PASS.length} chars)` : 'MISSING'
+  );
+
   if (
     !process.env.SMTP_HOST ||
     !process.env.SMTP_USER ||
     !process.env.SMTP_PASS
   ) {
-    console.log(
-      'Email not sent because SMTP credentials are not configured.'
+    throw new Error(
+      'SMTP_HOST, SMTP_USER or SMTP_PASS is missing in Render environment variables.'
     );
-
-    return {
-      success: false,
-      skipped: true
-    };
   }
-
-  const mailOptions = {
-    from: `"Mobile Care" <${process.env.SMTP_USER}>`,
-    to,
-    subject,
-    html,
-    text,
-  };
 
   try {
 
-    const info = await transporter.sendMail(mailOptions);
+    const info = await transporter.sendMail({
+      from: `"Mobile Care" <${process.env.SMTP_USER}>`,
+      to,
+      subject,
+      text,
+      html
+    });
+
+    console.log('✅ EMAIL ACTUALLY SENT');
+    console.log('Message ID:', info.messageId);
+    console.log('Accepted:', info.accepted);
+    console.log('Rejected:', info.rejected);
 
     if (repairId) {
-
       const { pool } = require('./db');
 
       await pool.query(
@@ -81,18 +89,15 @@ const sendEmail = async ({
 
   } catch (error) {
 
-    console.error(
-      'Email send error:',
-      error.message
-    );
+    console.error('❌ EMAIL SEND FAILED');
+    console.error('Error code:', error.code);
+    console.error('Error message:', error.message);
+    console.error('SMTP response:', error.response);
+    console.error('SMTP command:', error.command);
 
-    return {
-      success: false,
-      error: error.message
-    };
+    throw error;
   }
 };
-
 
 // =====================================================
 // ONLINE ORDER CONFIRMATION EMAIL
