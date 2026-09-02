@@ -90,7 +90,17 @@ CREATE TABLE IF NOT EXISTS sale_items (
     total_price NUMERIC(12,2) NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
-
+CREATE TABLE IF NOT EXISTS shop_info (
+    id SERIAL PRIMARY KEY,
+    shop_name VARCHAR(150) NOT NULL DEFAULT 'Mobile Care',
+    address TEXT DEFAULT '',
+    contact_number VARCHAR(50) DEFAULT '',
+    email VARCHAR(150) DEFAULT '',
+    shop_timing VARCHAR(150) DEFAULT '',
+    photo_url TEXT DEFAULT '',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
 CREATE TABLE IF NOT EXISTS warranties (
     id SERIAL PRIMARY KEY,
     repair_id INTEGER UNIQUE REFERENCES repairs(id) ON DELETE CASCADE,

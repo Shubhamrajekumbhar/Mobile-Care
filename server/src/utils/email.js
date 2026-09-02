@@ -1,65 +1,70 @@
-const nodemailer = require('nodemailer');
+const path = require('path');
 
-const SMTP_HOST = process.env.SMTP_HOST || 'smtp.gmail.com';
-const SMTP_PORT = Number(process.env.SMTP_PORT || 587);
-const SMTP_SECURE = String(process.env.SMTP_SECURE).toLowerCase() === 'true';
-const SMTP_USER = process.env.SMTP_USER;
-const SMTP_PASS = process.env.SMTP_PASS;
+require('dotenv').config({
+    path: path.resolve(__dirname, '../../../.env')
+});
+
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const EMAIL_FROM =
+    process.env.EMAIL_FROM || 'Mobile Care <onboarding@resend.dev>';
 
 console.log('📧 EMAIL CONFIG');
-console.log('SMTP HOST:', SMTP_HOST);
-console.log('SMTP PORT:', SMTP_PORT);
-console.log('SMTP SECURE:', SMTP_SECURE);
-console.log('SMTP USER:', SMTP_USER);
-console.log('SMTP PASS LENGTH:', SMTP_PASS ? SMTP_PASS.length : 0);
+console.log('EMAIL FROM:', EMAIL_FROM);
+console.log('RESEND API KEY:', RESEND_API_KEY ? 'SET' : 'NOT SET');
 
-const transporter = nodemailer.createTransport({
-    host: SMTP_HOST,
-    port: SMTP_PORT,
-    secure: SMTP_SECURE,
-    auth: {
-        user: SMTP_USER,
-        pass: SMTP_PASS
-    }
-});
 
 async function sendEmail({ to, subject, html, text }) {
 
-    if (!SMTP_USER || !SMTP_PASS) {
+    if (!RESEND_API_KEY) {
         throw new Error(
-            'SMTP_USER or SMTP_PASS is missing from the Render environment.'
+            'RESEND_API_KEY is missing from the Render environment.'
         );
     }
 
     try {
 
-        const info = await transporter.sendMail({
-            from: `"Mobile Care" <${SMTP_USER}>`,
-            to,
-            subject,
-            text,
-            html
+        const response = await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${RESEND_API_KEY}`
+            },
+
+            body: JSON.stringify({
+                from: EMAIL_FROM,
+                to: [to],
+                subject,
+                html,
+                text
+            })
         });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(
+                data?.message ||
+                data?.error?.message ||
+                `Resend API error (${response.status})`
+            );
+        }
 
         console.log('✅ EMAIL SENT');
         console.log('To:', to);
-        console.log('Message ID:', info.messageId);
-        console.log('Accepted:', info.accepted);
-        console.log('Rejected:', info.rejected);
+        console.log('Message ID:', data.id);
 
-        return info;
+        return data;
 
     } catch (error) {
 
         console.error('❌ EMAIL SEND FAILED');
-        console.error('Code:', error.code);
-        console.error('Command:', error.command);
-        console.error('Response:', error.response);
         console.error('Message:', error.message);
 
         throw error;
     }
 }
+
 
 async function sendRepairNotification({
     customerEmail,
@@ -117,6 +122,7 @@ async function sendRepairNotification({
     });
 }
 
+
 async function sendOrderConfirmationEmail({
     customerEmail,
     customerName,
@@ -167,6 +173,7 @@ async function sendOrderConfirmationEmail({
                             <th style="text-align:left;padding:8px;">Amount</th>
                         </tr>
                     </thead>
+
                     <tbody>
                         ${itemRows}
                     </tbody>
@@ -199,6 +206,7 @@ async function sendOrderConfirmationEmail({
         `
     });
 }
+
 
 module.exports = {
     sendEmail,

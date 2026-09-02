@@ -1770,8 +1770,8 @@ const email = emailInput ? emailInput.value.trim() : "";
                                 const phone =
                                     button.dataset.customerPhone;
 
-                                const email =
-                                 button.dataset.email || "";
+                               const email =
+    button.dataset.customerEmail || "";
 
                                 selected.style.display =
                                     "block";

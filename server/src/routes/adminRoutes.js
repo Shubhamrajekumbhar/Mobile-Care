@@ -418,7 +418,7 @@ router.post('/customers', authenticateAdmin, async (req, res) => {
       `INSERT INTO customers (name, phone, email, address)
        VALUES ($1, $2, $3, $4)
        RETURNING *`,
-      [name, phone, email, address || '']
+       [name, phone, email || '', address || '']
     );
     res.status(201).json(result.rows[0]);
   } catch (error) {
