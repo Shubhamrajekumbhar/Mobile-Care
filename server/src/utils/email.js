@@ -1,147 +1,207 @@
-const nodemailer = require("nodemailer");
-console.log("SMTP PASS LENGTH:", process.env.SMTP_PASS?.length);
+const nodemailer = require('nodemailer');
 
+const SMTP_HOST = process.env.SMTP_HOST || 'smtp.gmail.com';
+const SMTP_PORT = Number(process.env.SMTP_PORT || 587);
+const SMTP_SECURE = String(process.env.SMTP_SECURE).toLowerCase() === 'true';
+const SMTP_USER = process.env.SMTP_USER;
+const SMTP_PASS = process.env.SMTP_PASS;
+
+console.log('📧 EMAIL CONFIG');
+console.log('SMTP HOST:', SMTP_HOST);
+console.log('SMTP PORT:', SMTP_PORT);
+console.log('SMTP SECURE:', SMTP_SECURE);
+console.log('SMTP USER:', SMTP_USER);
+console.log('SMTP PASS LENGTH:', SMTP_PASS ? SMTP_PASS.length : 0);
 
 const transporter = nodemailer.createTransport({
-    service: "gmail",
-
+    host: SMTP_HOST,
+    port: SMTP_PORT,
+    secure: SMTP_SECURE,
     auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_APP_PASSWORD
+        user: SMTP_USER,
+        pass: SMTP_PASS
     }
 });
 
+async function sendEmail({ to, subject, html, text }) {
 
-async function sendReadyEmail({
+    if (!SMTP_USER || !SMTP_PASS) {
+        throw new Error(
+            'SMTP_USER or SMTP_PASS is missing from the Render environment.'
+        );
+    }
+
+    try {
+
+        const info = await transporter.sendMail({
+            from: `"Mobile Care" <${SMTP_USER}>`,
+            to,
+            subject,
+            text,
+            html
+        });
+
+        console.log('✅ EMAIL SENT');
+        console.log('To:', to);
+        console.log('Message ID:', info.messageId);
+        console.log('Accepted:', info.accepted);
+        console.log('Rejected:', info.rejected);
+
+        return info;
+
+    } catch (error) {
+
+        console.error('❌ EMAIL SEND FAILED');
+        console.error('Code:', error.code);
+        console.error('Command:', error.command);
+        console.error('Response:', error.response);
+        console.error('Message:', error.message);
+
+        throw error;
+    }
+}
+
+async function sendRepairNotification({
     customerEmail,
     customerName,
     jobId,
-    mobileModel
-})
-{
-   const trackingUrl =
-  
- `${process.env.APP_URL}/track.html?jobId=${encodeURIComponent(jobId)}`;
- if (status === 'Ready for Pickup') {
-    subject = `Your Mobile is Ready for Pickup - Job ID ${jobId}`;
+    status,
+    trackingUrl,
+    shopName = 'Mobile Care'
+}) {
 
-    html = `
-        <div style="font-family: Arial; max-width: 600px; margin: auto; padding: 25px;">
+    if (status !== 'Ready for Pickup') {
+        return;
+    }
 
-            <h2 style="color: #1769e0;">
-                Mobile Care
-            </h2>
-
-            <h3>Your mobile is ready for pickup! 🎉</h3>
-
-            <p>Hello <b>${customerName}</b>,</p>
-
-            <p>
-                Your mobile repair has been completed
-                and is now <b>Ready for Pickup</b>.
-            </p>
-
-            <p>
-                <b>Job ID:</b> ${jobId}
-            </p>
-
-            <p>
-                <b>Mobile:</b> ${model}
-            </p>
-
-            <br>
-
-            <a href="${trackingUrl}"
-               style="
-                    display: inline-block;
-                    background: #1769e0;
-                    color: white;
-                    padding: 12px 22px;
-                    text-decoration: none;
-                    border-radius: 6px;
-               ">
-                Track Your Repair
-            </a>
-
-            <br><br>
-
-            <p>
-                Click the button above to view your repair status.
-            </p>
-
-            <p>
-                Thank you for choosing Mobile Care.
-            </p>
-
-        </div>
-    `;
-}
-}
- {
-
-    const mailOptions = {
-
-        from: `"Mobile Care" <${process.env.EMAIL_USER}>`,
-
+    return sendEmail({
         to: customerEmail,
-
-        subject: `Your Mobile is Ready - Job ID ${jobId}`,
-
+        subject: `Your Repair is Ready for Pickup - ${jobId}`,
         html: `
-            <div style="
-                font-family: Arial;
-                max-width: 600px;
-                margin: auto;
-                padding: 25px;
-                border: 1px solid #ddd;
-                border-radius: 10px;
-            ">
+            <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;">
+                <h2>${shopName}</h2>
 
-                <h2 style="color:#1769e0;">
-                    Mobile Care
-                </h2>
-
-                <h3>
-                    Your mobile is ready for pickup! 🎉
-                </h3>
+                <p>Hello ${customerName || 'Customer'},</p>
 
                 <p>
-                    Hello <b>${customerName}</b>,
+                    Your mobile repair is now
+                    <strong>ready for pickup</strong>.
                 </p>
 
                 <p>
-                    Your mobile repair has been completed
-                    and is ready for pickup.
+                    <strong>Job ID:</strong> ${jobId}
                 </p>
 
-                <hr>
+                ${
+                    trackingUrl
+                        ? `
+                        <p>
+                            <a href="${trackingUrl}"
+                               style="
+                               display:inline-block;
+                               padding:12px 20px;
+                               background:#007bff;
+                               color:white;
+                               text-decoration:none;
+                               border-radius:6px;">
+                                Track Your Repair
+                            </a>
+                        </p>
+                        `
+                        : ''
+                }
+
+                <p>Thank you for choosing ${shopName}.</p>
+            </div>
+        `
+    });
+}
+
+async function sendOrderConfirmationEmail({
+    customerEmail,
+    customerName,
+    orderNumber,
+    items,
+    subtotal,
+    discount,
+    total,
+    deliveryAddress,
+    trackingUrl,
+    shopName = 'Mobile Care'
+}) {
+
+    const itemRows = (items || []).map(item => `
+        <tr>
+            <td style="padding:8px;border-bottom:1px solid #ddd;">
+                ${item.productName || item.product_name}
+            </td>
+            <td style="padding:8px;border-bottom:1px solid #ddd;">
+                ${item.quantity}
+            </td>
+            <td style="padding:8px;border-bottom:1px solid #ddd;">
+                ₹${Number(item.totalPrice || item.total_price || 0).toFixed(2)}
+            </td>
+        </tr>
+    `).join('');
+
+    return sendEmail({
+        to: customerEmail,
+        subject: `Order Confirmation - ${orderNumber}`,
+        html: `
+            <div style="font-family:Arial,sans-serif;max-width:650px;margin:auto;">
+
+                <h2>${shopName}</h2>
+
+                <p>Hello ${customerName || 'Customer'},</p>
 
                 <p>
-                    <b>Job ID:</b> ${jobId}
+                    Your order <strong>${orderNumber}</strong>
+                    has been successfully placed.
                 </p>
 
-                <p>
-                    <b>Mobile:</b> ${mobileModel}
-                </p>
+                <table style="width:100%;border-collapse:collapse;">
+                    <thead>
+                        <tr>
+                            <th style="text-align:left;padding:8px;">Product</th>
+                            <th style="text-align:left;padding:8px;">Qty</th>
+                            <th style="text-align:left;padding:8px;">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${itemRows}
+                    </tbody>
+                </table>
+
+                <p>Subtotal: ₹${Number(subtotal || 0).toFixed(2)}</p>
+                <p>Discount: ₹${Number(discount || 0).toFixed(2)}</p>
+                <h3>Total: ₹${Number(total || 0).toFixed(2)}</h3>
 
                 <p>
-                    Please visit our shop to collect your
-                    mobile.
+                    <strong>Delivery Address:</strong><br>
+                    ${deliveryAddress || 'N/A'}
                 </p>
 
-                <p>
-                    Thank you for choosing
-                    <b>Mobile Care</b>.
-                </p>
+                ${
+                    trackingUrl
+                        ? `
+                        <p>
+                            <a href="${trackingUrl}">
+                                Track Your Order
+                            </a>
+                        </p>
+                        `
+                        : ''
+                }
+
+                <p>Thank you for shopping with ${shopName}.</p>
 
             </div>
         `
-    };
-
-    return transporter.sendMail(mailOptions);
+    });
 }
 
-
 module.exports = {
-    sendReadyEmail
+    sendEmail,
+    sendRepairNotification,
+    sendOrderConfirmationEmail
 };
