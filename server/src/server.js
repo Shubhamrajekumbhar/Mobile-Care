@@ -9,7 +9,7 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
 });
-const { sendEmail } = require('./src/config/email');
+const { sendEmail } = require('./config/email');
 
 sendEmail({
     to: process.env.SMTP_USER,
