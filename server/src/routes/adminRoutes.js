@@ -645,12 +645,13 @@ const shopContact = shop.contact_number || '';
 const shopEmail = shop.email || '';
 const shopTiming = shop.shop_timing || '';
 
-await sendEmail({
-  to: email,
+try {
+  await sendEmail({
+    to: email,
 
-  subject: `${shopName} - Repair Request Registered - ${jobId}`,
+    subject: `${shopName} - Repair Request Registered - ${jobId}`,
 
-  text: `
+    text: `
 Hi ${customerName},
 
 Your repair request has been successfully registered.
@@ -671,110 +672,123 @@ Email: ${shopEmail}
 Opening Hours: ${shopTiming}
 `,
 
-  html: `
-    <div style="
-      font-family: Arial, sans-serif;
-      max-width: 620px;
-      margin: 0 auto;
-      padding: 25px;
-      background: #f6f9ff;
-      border: 1px solid #dbe8ff;
-      border-radius: 12px;
-    ">
-
-      <h2 style="color:#1769e0;">
-        ${shopName}
-      </h2>
-
-      <h3>
-        Repair Request Registered ✅
-      </h3>
-
-      <p>
-        Hi <b>${customerName}</b>,
-      </p>
-
-      <p>
-        Your repair request has been successfully registered.
-      </p>
-
+    html: `
       <div style="
-        background:#ffffff;
-        padding:15px;
-        border-radius:8px;
-        border:1px solid #e2e8f0;
+        font-family: Arial, sans-serif;
+        max-width: 620px;
+        margin: 0 auto;
+        padding: 25px;
+        background: #f6f9ff;
+        border: 1px solid #dbe8ff;
+        border-radius: 12px;
       ">
 
-        <p><b>Job ID:</b> ${jobId}</p>
-        <p><b>Mobile:</b> ${mobileBrand} ${mobileModel}</p>
-        <p><b>IMEI:</b> ${imei}</p>
-        <p><b>Status:</b> Repair Request Received</p>
-
-      </div>
-
-      <p>
-        We will keep you updated about your repair.
-      </p>
-
-      <hr style="
-        border:0;
-        border-top:1px solid #e2e8f0;
-        margin:25px 0;
-      ">
-
-      <div style="
-        color:#64748b;
-        font-size:13px;
-        line-height:1.7;
-      ">
-
-        <strong style="color:#0f172a;">
+        <h2 style="color:#1769e0;">
           ${shopName}
-        </strong>
-        <br>
+        </h2>
 
-        ${shopAddress}
-        <br>
+        <h3>
+          Repair Request Registered ✅
+        </h3>
 
-        📞 ${shopContact}
-        <br>
+        <p>
+          Hi <b>${customerName}</b>,
+        </p>
 
-        ✉ ${shopEmail}
-        <br>
+        <p>
+          Your repair request has been successfully registered.
+        </p>
 
-        🕐 ${shopTiming}
+        <div style="
+          background:#ffffff;
+          padding:15px;
+          border-radius:8px;
+          border:1px solid #e2e8f0;
+        ">
+
+          <p><b>Job ID:</b> ${jobId}</p>
+          <p><b>Mobile:</b> ${mobileBrand} ${mobileModel}</p>
+          <p><b>IMEI:</b> ${imei}</p>
+          <p><b>Status:</b> Repair Request Received</p>
+
+        </div>
+
+        <p>
+          We will keep you updated about your repair.
+        </p>
+
+        <hr style="
+          border:0;
+          border-top:1px solid #e2e8f0;
+          margin:25px 0;
+        ">
+
+        <div style="
+          color:#64748b;
+          font-size:13px;
+          line-height:1.7;
+        ">
+
+          <strong style="color:#0f172a;">
+            ${shopName}
+          </strong>
+          <br>
+
+          ${shopAddress}
+          <br>
+
+          📞 ${shopContact}
+          <br>
+
+          ✉ ${shopEmail}
+          <br>
+
+          🕐 ${shopTiming}
+
+        </div>
 
       </div>
 
-    </div>
-    <p style="text-align:center; margin:25px 0;">
-  <a
-    href="${trackingUrl}"
-    style="
-      display:inline-block;
-      padding:13px 24px;
-      background:#1769e0;
-      color:#ffffff;
-      text-decoration:none;
-      border-radius:8px;
-      font-weight:bold;
-    "
-  >
-    Track My Repair
-  </a>
-</p>
-  `,
+      <p style="text-align:center; margin:25px 0;">
+        <a
+          href="${trackingUrl}"
+          style="
+            display:inline-block;
+            padding:13px 24px;
+            background:#1769e0;
+            color:#ffffff;
+            text-decoration:none;
+            border-radius:8px;
+            font-weight:bold;
+          "
+        >
+          Track My Repair
+        </a>
+      </p>
+    `,
 
-  repairId: repair.id,
+    repairId: repair.id,
+  });
+
+  console.log(`✅ Repair registration email sent to ${email}`);
+
+} catch (emailError) {
+  console.error(
+    '❌ Repair registration email failed:',
+    emailError.message
+  );
+}
+
+// IMPORTANT: repair creation succeeds even if email fails
+res.status(201).json(repair);
+
+} catch (error) {
+  console.error('Repair creation error:', error);
+  res.status(500).json({
+    message: 'Failed to create repair record.'
+  });
+}
 });
-
-    res.status(201).json(repair);
- } catch (error) {
-    console.error('Repair creation error:', error);
-    res.status(500).json({ message: 'Failed to create repair record.' });
-  }
-});
-
 router.put('/repairs/:id', authenticateAdmin, async (req, res) => {
   const { id } = req.params;
 
