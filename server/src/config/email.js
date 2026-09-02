@@ -1,26 +1,25 @@
-const nodemailer = require('nodemailer');
+
 const path = require('path');
 
 require('dotenv').config({
   path: path.resolve(__dirname, '../../../.env')
 });
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: Number(process.env.SMTP_PORT || 587),
-  secure: process.env.SMTP_SECURE === 'true',
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
 
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-});
+const EMAIL_FROM =
+  process.env.EMAIL_FROM || 'Mobile Care <onboarding@resend.dev>';
 
+console.log('📧 EMAIL CONFIG');
+console.log('EMAIL FROM:', EMAIL_FROM);
+console.log(
+  'RESEND API KEY:',
+  RESEND_API_KEY ? 'SET' : 'NOT SET'
+);
 
 // =====================================================
 // GENERAL EMAIL FUNCTION
 // =====================================================
-
 
 const sendEmail = async ({
   to,
@@ -32,38 +31,49 @@ const sendEmail = async ({
 
   console.log('📧 Attempting to send email...');
   console.log('To:', to);
-  console.log('SMTP HOST:', process.env.SMTP_HOST);
-  console.log('SMTP PORT:', process.env.SMTP_PORT);
-  console.log('SMTP USER:', process.env.SMTP_USER);
   console.log(
-    'SMTP PASS:',
-    process.env.SMTP_PASS ? `SET (${process.env.SMTP_PASS.length} chars)` : 'MISSING'
+    'RESEND API KEY:',
+    RESEND_API_KEY ? 'SET' : 'NOT SET'
   );
 
-  if (
-    !process.env.SMTP_HOST ||
-    !process.env.SMTP_USER ||
-    !process.env.SMTP_PASS
-  ) {
+  if (!RESEND_API_KEY) {
     throw new Error(
-      'SMTP_HOST, SMTP_USER or SMTP_PASS is missing in Render environment variables.'
+      'RESEND_API_KEY is missing from Render environment variables.'
     );
   }
 
   try {
 
-    const info = await transporter.sendMail({
-      from: `"Mobile Care" <${process.env.SMTP_USER}>`,
-      to,
-      subject,
-      text,
-      html
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${RESEND_API_KEY}`
+      },
+
+      body: JSON.stringify({
+        from: EMAIL_FROM,
+        to: [to],
+        subject,
+        html,
+        text
+      })
     });
 
-    console.log('✅ EMAIL ACTUALLY SENT');
-    console.log('Message ID:', info.messageId);
-    console.log('Accepted:', info.accepted);
-    console.log('Rejected:', info.rejected);
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data?.message ||
+        data?.error?.message ||
+        `Resend API error (${response.status})`
+      );
+    }
+
+    console.log('✅ EMAIL SENT THROUGH RESEND');
+    console.log('To:', to);
+    console.log('Message ID:', data.id);
 
     if (repairId) {
       const { pool } = require('./db');
@@ -84,20 +94,18 @@ const sendEmail = async ({
 
     return {
       success: true,
-      info
+      id: data.id
     };
 
   } catch (error) {
 
-    console.error('❌ EMAIL SEND FAILED');
-    console.error('Error code:', error.code);
-    console.error('Error message:', error.message);
-    console.error('SMTP response:', error.response);
-    console.error('SMTP command:', error.command);
+    console.error('❌ RESEND EMAIL FAILED');
+    console.error('Message:', error.message);
 
     throw error;
   }
 };
+
 
 // =====================================================
 // ONLINE ORDER CONFIRMATION EMAIL
