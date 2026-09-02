@@ -47,10 +47,11 @@ const sendEmail = async ({
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
 
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${RESEND_API_KEY}`
-      },
+    headers: {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${RESEND_API_KEY}`,
+    'User-Agent': 'Mobile-Care/1.0'
+},
 
       body: JSON.stringify({
         from: EMAIL_FROM,
@@ -61,15 +62,18 @@ const sendEmail = async ({
       })
     });
 
-    const data = await response.json();
+ const data = await response.json();
 
-    if (!response.ok) {
-      throw new Error(
+console.log('📨 RESEND STATUS:', response.status);
+console.log('📨 RESEND RESPONSE:', JSON.stringify(data));
+
+if (!response.ok) {
+    throw new Error(
         data?.message ||
         data?.error?.message ||
         `Resend API error (${response.status})`
-      );
-    }
+    );
+}
 
     console.log('✅ EMAIL SENT THROUGH RESEND');
     console.log('To:', to);
