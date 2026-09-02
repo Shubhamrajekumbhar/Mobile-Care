@@ -735,7 +735,7 @@ Thank you for choosing Mobile Care.
 // =====================================================
 
 module.exports = {
-  transporter,
+
   sendEmail,
   sendRepairNotification,
   sendOrderConfirmationEmail
