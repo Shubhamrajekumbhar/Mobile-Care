@@ -97,7 +97,7 @@ async function sendRepairNotification({
       shop.shop_timing || '';
 
     const trackingUrl =
-      `${process.env.APP_URL}/track-repair?jobId=${encodeURIComponent(jobId)}`;
+      `${process.env.SITE_URL}/track-repair?jobId=${encodeURIComponent(jobId)}`;
 
     const bodyText = `
 Hello ${customerName},
@@ -623,7 +623,7 @@ if (
     }
 
     const trackingUrl =
-  `${process.env.APP_URL}/track-repair?jobId=${encodeURIComponent(jobId)}`;
+  `${process.env.SITE_URL}/track-repair?jobId=${encodeURIComponent(jobId)}`;
 
 const shopResult = await pool.query(
   `SELECT
