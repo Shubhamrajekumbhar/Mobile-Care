@@ -14,7 +14,7 @@ const REPLY_TO =
     process.env.REPLY_TO ||
     'swamisamarthsshop@gmail.com';
 
-console.log('EMAIL CONFIG');
+console.log('🔥🔥🔥 NEW EMAIL.JS CODE IS RUNNING 🔥🔥🔥');
 console.log('EMAIL FROM:', EMAIL_FROM);
 console.log('REPLY TO:', REPLY_TO);
 console.log('RESEND API KEY:', RESEND_API_KEY ? 'SET' : 'NOT SET');
