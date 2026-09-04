@@ -1956,6 +1956,86 @@ Thank you for choosing ${shopName} ❤️
   }
 
 });
+router.delete('/sales/:id', authenticateAdmin, async (req, res) => {
+  const client = await pool.connect();
+
+  try {
+    const saleId = Number(req.params.id);
+
+    if (!Number.isInteger(saleId) || saleId <= 0) {
+      return res.status(400).json({
+        message: 'Invalid sale ID.'
+      });
+    }
+
+    await client.query('BEGIN');
+
+    // Get sold items so their quantities can be returned to inventory
+    const itemsResult = await client.query(
+      `SELECT product_id, quantity
+       FROM sale_items
+       WHERE sale_id = $1`,
+      [saleId]
+    );
+
+    // Check that the sale exists
+    const saleResult = await client.query(
+      `SELECT id
+       FROM sales
+       WHERE id = $1`,
+      [saleId]
+    );
+
+    if (saleResult.rowCount === 0) {
+      await client.query('ROLLBACK');
+
+      return res.status(404).json({
+        message: 'Sale not found.'
+      });
+    }
+
+    // Return sold quantities to inventory
+    for (const item of itemsResult.rows) {
+      if (item.product_id) {
+        await client.query(
+          `UPDATE inventory
+           SET quantity = quantity + $1,
+               updated_at = NOW()
+           WHERE id = $2`,
+          [item.quantity, item.product_id]
+        );
+      }
+    }
+
+    // Delete the sale
+    // sale_items and warranties are configured with ON DELETE CASCADE
+    await client.query(
+      `DELETE FROM sales
+       WHERE id = $1`,
+      [saleId]
+    );
+
+    await client.query('COMMIT');
+
+    res.json({
+      success: true,
+      message: 'Sale deleted successfully.'
+    });
+
+  } catch (error) {
+
+    await client.query('ROLLBACK');
+
+    console.error('Delete sale error:', error);
+
+    res.status(500).json({
+      message: 'Failed to delete sale.'
+    });
+
+  } finally {
+    client.release();
+  }
+});
 
 router.get('/online-orders', authenticateAdmin, async (req, res) => {
   try {
