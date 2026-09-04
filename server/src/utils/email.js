@@ -10,15 +10,18 @@ const EMAIL_FROM =
     process.env.EMAIL_FROM ||
     'Mobile Care <noreply@mobilecare.dpdns.org>';
 
-const EMAIL_REPLY_TO =
-    process.env.EMAIL_REPLY_TO ||
+const REPLY_TO =
+    process.env.REPLY_TO ||
     'swamisamarthsshop@gmail.com';
 
 
-console.log('EMAIL CONFIG');
+console.log('📧 EMAIL CONFIG');
 console.log('EMAIL FROM:', EMAIL_FROM);
-console.log('EMAIL REPLY TO:', EMAIL_REPLY_TO);
-console.log('RESEND API KEY:', RESEND_API_KEY ? 'SET' : 'NOT SET');
+console.log('REPLY TO:', REPLY_TO);
+console.log(
+    'RESEND API KEY:',
+    RESEND_API_KEY ? 'SET' : 'NOT SET'
+);
 
 
 // --------------------------------------------------
@@ -26,7 +29,12 @@ console.log('RESEND API KEY:', RESEND_API_KEY ? 'SET' : 'NOT SET');
 // --------------------------------------------------
 
 function escapeHtml(value) {
-    return String(value ?? '')
+
+    if (value === null || value === undefined) {
+        return '';
+    }
+
+    return String(value)
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
@@ -36,19 +44,20 @@ function escapeHtml(value) {
 
 
 // --------------------------------------------------
-// Base Email Sender
+// Send Email
 // --------------------------------------------------
 
 async function sendEmail({
     to,
     subject,
     html,
-    text
+    text,
+    replyTo = REPLY_TO
 }) {
 
     if (!RESEND_API_KEY) {
         throw new Error(
-            'RESEND_API_KEY is missing from the Render environment.'
+            'RESEND_API_KEY is missing from Render environment.'
         );
     }
 
@@ -56,7 +65,15 @@ async function sendEmail({
         throw new Error('Recipient email is missing.');
     }
 
+    if (!subject) {
+        throw new Error('Email subject is missing.');
+    }
+
     try {
+
+        console.log('📧 Attempting to send email...');
+        console.log('To:', to);
+        console.log('Subject:', subject);
 
         const response = await fetch(
             'https://api.resend.com/emails',
@@ -69,19 +86,36 @@ async function sendEmail({
                 },
 
                 body: JSON.stringify({
+
                     from: EMAIL_FROM,
+
                     to: [to],
-                    reply_to: EMAIL_REPLY_TO,
+
+                    reply_to: replyTo
+                        ? [replyTo]
+                        : undefined,
+
                     subject,
+
                     html,
-                    text
+
+                    text:
+                        text ||
+                        'Please view this email in an HTML-compatible email client.'
                 })
             }
         );
 
         const data = await response.json();
 
+        console.log('📨 RESEND STATUS:', response.status);
+        console.log(
+            '📨 RESEND RESPONSE:',
+            JSON.stringify(data)
+        );
+
         if (!response.ok) {
+
             throw new Error(
                 data?.message ||
                 data?.error?.message ||
@@ -89,7 +123,7 @@ async function sendEmail({
             );
         }
 
-        console.log('EMAIL SENT THROUGH RESEND');
+        console.log('✅ EMAIL SENT THROUGH RESEND');
         console.log('To:', to);
         console.log('Message ID:', data.id);
 
@@ -97,7 +131,7 @@ async function sendEmail({
 
     } catch (error) {
 
-        console.error('EMAIL SEND FAILED');
+        console.error('❌ EMAIL SEND FAILED');
         console.error('Message:', error.message);
 
         throw error;
@@ -106,27 +140,23 @@ async function sendEmail({
 
 
 // --------------------------------------------------
-// Simple Email Layout
+// Common Email Layout
 // --------------------------------------------------
 
-function emailLayout({
-    shopName,
-    title,
-    content
-}) {
+function emailLayout(content) {
 
     return `
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${escapeHtml(title)}</title>
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
 </head>
 
 <body style="
     margin:0;
-    padding:20px;
+    padding:0;
     background:#f5f5f5;
     font-family:Arial,Helvetica,sans-serif;
     color:#222;
@@ -134,45 +164,35 @@ function emailLayout({
 
 <div style="
     max-width:600px;
-    margin:0 auto;
+    margin:20px auto;
     background:#ffffff;
     border:1px solid #dddddd;
+    border-radius:8px;
     padding:25px;
 ">
 
-    <h2 style="
-        margin-top:0;
-        color:#1769e0;
-    ">
-        ${escapeHtml(shopName)}
-    </h2>
-
-    <h3 style="
-        color:#222;
-        margin-bottom:20px;
-    ">
-        ${escapeHtml(title)}
-    </h3>
-
     ${content}
 
-    <hr style="
-        border:0;
-        border-top:1px solid #dddddd;
-        margin:25px 0;
-    ">
-
-    <p style="
+    <div style="
+        margin-top:30px;
+        padding-top:15px;
+        border-top:1px solid #eeeeee;
         font-size:13px;
         color:#666;
         line-height:1.6;
     ">
-        ${escapeHtml(shopName)}<br>
-        Swami Samarth Mobile Shop<br>
+
+        <strong>Swami Samarth Mobile Shop</strong><br>
+
         Shewalewadi, Pune<br>
+
         Phone: 9922777092<br>
-        Email: swamisamarthsshop@gmail.com
-    </p>
+
+        Email: swamisamarthsshop@gmail.com<br>
+
+        Business Hours: 10:00 AM - 9:00 PM
+
+    </div>
 
 </div>
 
@@ -183,101 +203,232 @@ function emailLayout({
 
 
 // --------------------------------------------------
-// Repair Ready Notification
+// Repair Registration Email
+// --------------------------------------------------
+
+async function sendRepairRegistrationEmail({
+
+    customerEmail,
+    customerName,
+    jobId,
+    mobile,
+    imei,
+    status = 'Repair Request Received',
+    trackingUrl,
+    shopName = 'Swami Samarth Mobile Shop'
+
+}) {
+
+    const name = escapeHtml(customerName || 'Customer');
+    const job = escapeHtml(jobId);
+    const phone = escapeHtml(mobile || 'Not provided');
+    const imeiNumber = escapeHtml(imei || 'Not provided');
+    const repairStatus = escapeHtml(status);
+    const shop = escapeHtml(shopName);
+
+    const html = emailLayout(`
+
+        <h2 style="margin-top:0;">
+            ${shop}
+        </h2>
+
+        <h3>
+            Repair Request Received
+        </h3>
+
+        <p>
+            Hello ${name},
+        </p>
+
+        <p>
+            Your repair request has been successfully registered.
+        </p>
+
+        <p>
+            <strong>Job ID:</strong> ${job}<br>
+            <strong>Device:</strong> ${phone}<br>
+            <strong>IMEI:</strong> ${imeiNumber}<br>
+            <strong>Status:</strong> ${repairStatus}
+        </p>
+
+        ${
+            trackingUrl
+                ? `
+                <p>
+                    <a href="${escapeHtml(trackingUrl)}"
+                       style="
+                       display:inline-block;
+                       padding:10px 18px;
+                       background:#1769e0;
+                       color:#ffffff;
+                       text-decoration:none;
+                       border-radius:5px;">
+                        View Repair Status
+                    </a>
+                </p>
+                `
+                : ''
+        }
+
+        <p>
+            We will contact you when there is an update
+            regarding your repair.
+        </p>
+
+        <p>
+            Thank you,<br>
+            ${shop}
+        </p>
+
+    `);
+
+    const text = `
+Hello ${customerName || 'Customer'},
+
+Your repair request has been successfully registered.
+
+Job ID: ${jobId}
+Device: ${mobile || 'Not provided'}
+IMEI: ${imei || 'Not provided'}
+Status: ${status}
+
+${trackingUrl ? `Repair Status: ${trackingUrl}` : ''}
+
+Thank you,
+${shopName}
+
+Swami Samarth Mobile Shop
+Phone: 9922777092
+Email: swamisamarthsshop@gmail.com
+`;
+
+    return sendEmail({
+
+        to: customerEmail,
+
+        subject:
+            `Repair Request ${jobId}`,
+
+        html,
+
+        text
+
+    });
+}
+
+
+// --------------------------------------------------
+// Repair Ready For Pickup Email
 // --------------------------------------------------
 
 async function sendRepairNotification({
+
     customerEmail,
     customerName,
     jobId,
     status,
     trackingUrl,
-    shopName = 'Mobile Care'
+    shopName = 'Swami Samarth Mobile Shop'
+
 }) {
 
     if (status !== 'Ready for Pickup') {
         return;
     }
 
-    const safeName =
-        escapeHtml(customerName || 'Customer');
+    const name = escapeHtml(customerName || 'Customer');
+    const job = escapeHtml(jobId);
+    const shop = escapeHtml(shopName);
 
-    const safeJobId =
-        escapeHtml(jobId);
+    const html = emailLayout(`
 
-    const trackingSection = trackingUrl
-        ? `
-            <p style="margin-top:20px;">
-                <a
-                    href="${escapeHtml(trackingUrl)}"
-                    style="
-                        display:inline-block;
-                        padding:10px 18px;
-                        background:#1769e0;
-                        color:#ffffff;
-                        text-decoration:none;
-                        border-radius:5px;
-                    "
-                >
-                    Track Your Repair
-                </a>
-            </p>
-        `
-        : '';
+        <h2>
+            ${shop}
+        </h2>
 
-    const html = emailLayout({
-        shopName,
-        title: 'Repair Ready for Pickup',
-        content: `
-            <p>Hello ${safeName},</p>
+        <h3>
+            Repair Update
+        </h3>
 
-            <p>
-                Your mobile repair is ready for pickup.
-            </p>
+        <p>
+            Hello ${name},
+        </p>
 
-            <p>
-                <strong>Job ID:</strong> ${safeJobId}
-            </p>
+        <p>
+            Your repaired device is now ready for pickup.
+        </p>
 
-            ${trackingSection}
+        <p>
+            <strong>Job ID:</strong> ${job}
+        </p>
 
-            <p>
-                Thank you for choosing ${escapeHtml(shopName)}.
-            </p>
-        `
-    });
+        ${
+            trackingUrl
+                ? `
+                <p>
+                    <a href="${escapeHtml(trackingUrl)}"
+                       style="
+                       display:inline-block;
+                       padding:10px 18px;
+                       background:#1769e0;
+                       color:#ffffff;
+                       text-decoration:none;
+                       border-radius:5px;">
+                        View Repair Status
+                    </a>
+                </p>
+                `
+                : ''
+        }
+
+        <p>
+            Please contact the shop if you have any questions.
+        </p>
+
+        <p>
+            Thank you,<br>
+            ${shop}
+        </p>
+
+    `);
 
     const text = `
 Hello ${customerName || 'Customer'},
 
-Your mobile repair is ready for pickup.
+Your repaired device is now ready for pickup.
 
 Job ID: ${jobId}
 
-${trackingUrl ? `Track your repair: ${trackingUrl}` : ''}
+${trackingUrl ? `Repair Status: ${trackingUrl}` : ''}
 
-Thank you for choosing ${shopName}.
-
+Thank you,
 ${shopName}
-Swami Samarth Mobile Shop
+
 Phone: 9922777092
 Email: swamisamarthsshop@gmail.com
-`.trim();
+`;
 
     return sendEmail({
+
         to: customerEmail,
-        subject: `Repair Ready for Pickup - ${jobId}`,
+
+        subject:
+            `Repair Update ${jobId}`,
+
         html,
+
         text
+
     });
 }
 
 
 // --------------------------------------------------
-// Order Confirmation
+// Order Confirmation Email
 // --------------------------------------------------
 
 async function sendOrderConfirmationEmail({
+
     customerEmail,
     customerName,
     orderNumber,
@@ -287,19 +438,19 @@ async function sendOrderConfirmationEmail({
     total,
     deliveryAddress,
     trackingUrl,
-    shopName = 'Mobile Care'
+    shopName = 'Swami Samarth Mobile Shop'
+
 }) {
 
-    const safeName =
-        escapeHtml(customerName || 'Customer');
-
-    const safeOrder =
-        escapeHtml(orderNumber);
+    const name = escapeHtml(customerName || 'Customer');
+    const order = escapeHtml(orderNumber);
+    const address = escapeHtml(deliveryAddress || 'Not provided');
+    const shop = escapeHtml(shopName);
 
     const itemRows = (items || [])
         .map(item => {
 
-            const productName =
+            const product =
                 escapeHtml(
                     item.productName ||
                     item.product_name ||
@@ -318,138 +469,147 @@ async function sendOrderConfirmationEmail({
 
             return `
                 <tr>
+
                     <td style="
                         padding:8px;
-                        border-bottom:1px solid #dddddd;
-                    ">
-                        ${productName}
+                        border-bottom:1px solid #eeeeee;">
+                        ${product}
                     </td>
 
                     <td style="
                         padding:8px;
-                        border-bottom:1px solid #dddddd;
-                    ">
+                        border-bottom:1px solid #eeeeee;">
                         ${quantity}
                     </td>
 
                     <td style="
                         padding:8px;
-                        border-bottom:1px solid #dddddd;
-                    ">
+                        border-bottom:1px solid #eeeeee;">
                         ₹${price.toFixed(2)}
                     </td>
+
                 </tr>
             `;
         })
         .join('');
 
-    const safeAddress =
-        escapeHtml(deliveryAddress || 'Not provided');
+    const sub =
+        Number(subtotal || 0).toFixed(2);
 
-    const trackingSection = trackingUrl
-        ? `
-            <p style="margin-top:20px;">
-                <a
-                    href="${escapeHtml(trackingUrl)}"
-                    style="
-                        display:inline-block;
-                        padding:10px 18px;
-                        background:#1769e0;
-                        color:#ffffff;
-                        text-decoration:none;
-                        border-radius:5px;
-                    "
-                >
-                    Track Your Order
-                </a>
-            </p>
-        `
-        : '';
+    const disc =
+        Number(discount || 0).toFixed(2);
 
-    const html = emailLayout({
-        shopName,
-        title: 'Order Confirmation',
-        content: `
-            <p>Hello ${safeName},</p>
+    const finalTotal =
+        Number(total || 0).toFixed(2);
 
-            <p>
-                Your order has been successfully placed.
-            </p>
+    const html = emailLayout(`
 
-            <p>
-                <strong>Order Number:</strong> ${safeOrder}
-            </p>
+        <h2>
+            ${shop}
+        </h2>
 
-            <table style="
-                width:100%;
-                border-collapse:collapse;
-                margin-top:20px;
-            ">
+        <h3>
+            Order Confirmation
+        </h3>
 
-                <thead>
-                    <tr>
-                        <th style="
-                            text-align:left;
-                            padding:8px;
-                            border-bottom:1px solid #dddddd;
-                        ">
-                            Product
-                        </th>
+        <p>
+            Hello ${name},
+        </p>
 
-                        <th style="
-                            text-align:left;
-                            padding:8px;
-                            border-bottom:1px solid #dddddd;
-                        ">
-                            Qty
-                        </th>
+        <p>
+            Your order has been successfully placed.
+        </p>
 
-                        <th style="
-                            text-align:left;
-                            padding:8px;
-                            border-bottom:1px solid #dddddd;
-                        ">
-                            Amount
-                        </th>
-                    </tr>
-                </thead>
+        <p>
+            <strong>Order Number:</strong> ${order}
+        </p>
 
-                <tbody>
-                    ${itemRows}
-                </tbody>
+        <table style="
+            width:100%;
+            border-collapse:collapse;
+            margin-top:15px;
+        ">
 
-            </table>
+            <thead>
 
-            <p>
-                Subtotal: ₹${Number(subtotal || 0).toFixed(2)}
-            </p>
+                <tr>
 
-            <p>
-                Discount: ₹${Number(discount || 0).toFixed(2)}
-            </p>
+                    <th style="
+                        text-align:left;
+                        padding:8px;
+                        border-bottom:1px solid #cccccc;">
+                        Product
+                    </th>
 
-            <p style="font-size:18px;">
-                <strong>
-                    Total: ₹${Number(total || 0).toFixed(2)}
-                </strong>
-            </p>
+                    <th style="
+                        text-align:left;
+                        padding:8px;
+                        border-bottom:1px solid #cccccc;">
+                        Qty
+                    </th>
 
-            <p>
-                <strong>Delivery Address:</strong><br>
-                ${safeAddress}
-            </p>
+                    <th style="
+                        text-align:left;
+                        padding:8px;
+                        border-bottom:1px solid #cccccc;">
+                        Amount
+                    </th>
 
-            ${trackingSection}
+                </tr>
 
-            <p>
-                Thank you for shopping with ${escapeHtml(shopName)}.
-            </p>
-        `
-    });
+            </thead>
 
-    const itemText = (items || [])
+            <tbody>
+
+                ${itemRows}
+
+            </tbody>
+
+        </table>
+
+        <p>
+            Subtotal: ₹${sub}<br>
+            Discount: ₹${disc}
+        </p>
+
+        <h3>
+            Total: ₹${finalTotal}
+        </h3>
+
+        <p>
+            <strong>Delivery Address</strong><br>
+            ${address}
+        </p>
+
+        ${
+            trackingUrl
+                ? `
+                <p>
+                    <a href="${escapeHtml(trackingUrl)}"
+                       style="
+                       display:inline-block;
+                       padding:10px 18px;
+                       background:#1769e0;
+                       color:#ffffff;
+                       text-decoration:none;
+                       border-radius:5px;">
+                        Track Order
+                    </a>
+                </p>
+                `
+                : ''
+        }
+
+        <p>
+            Thank you for your order.
+        </p>
+
+    `);
+
+    const plainItems = (items || [])
         .map(item => {
-            const name =
+
+            const product =
                 item.productName ||
                 item.product_name ||
                 'Product';
@@ -462,9 +622,9 @@ async function sendOrderConfirmationEmail({
                     item.totalPrice ||
                     item.total_price ||
                     0
-                );
+                ).toFixed(2);
 
-            return `${name} - Qty: ${quantity} - ₹${price.toFixed(2)}`;
+            return `${product} - Qty: ${quantity} - ₹${price}`;
         })
         .join('\n');
 
@@ -476,36 +636,157 @@ Your order has been successfully placed.
 Order Number: ${orderNumber}
 
 Items:
-${itemText}
+${plainItems}
 
-Subtotal: ₹${Number(subtotal || 0).toFixed(2)}
-Discount: ₹${Number(discount || 0).toFixed(2)}
-Total: ₹${Number(total || 0).toFixed(2)}
+Subtotal: ₹${sub}
+Discount: ₹${disc}
+Total: ₹${finalTotal}
 
 Delivery Address:
 ${deliveryAddress || 'Not provided'}
 
-${trackingUrl ? `Track your order: ${trackingUrl}` : ''}
+${trackingUrl ? `Track Order: ${trackingUrl}` : ''}
 
-Thank you for shopping with ${shopName}.
-
+Thank you,
 ${shopName}
-Swami Samarth Mobile Shop
+
 Phone: 9922777092
 Email: swamisamarthsshop@gmail.com
-`.trim();
+`;
 
     return sendEmail({
+
         to: customerEmail,
-        subject: `Order Confirmation - ${orderNumber}`,
+
+        subject:
+            `Order Confirmation ${orderNumber}`,
+
         html,
+
         text
+
     });
 }
 
 
+// --------------------------------------------------
+// Generic Warranty / Invoice Email
+// --------------------------------------------------
+
+async function sendWarrantyInvoiceEmail({
+
+    customerEmail,
+    customerName,
+    invoiceNumber,
+    amount,
+    warrantyDetails,
+    shopName = 'Swami Samarth Mobile Shop'
+
+}) {
+
+    const name =
+        escapeHtml(customerName || 'Customer');
+
+    const invoice =
+        escapeHtml(invoiceNumber || 'N/A');
+
+    const warranty =
+        escapeHtml(warrantyDetails || 'Warranty details are available from the shop.');
+
+    const total =
+        Number(amount || 0).toFixed(2);
+
+    const shop =
+        escapeHtml(shopName);
+
+    const html = emailLayout(`
+
+        <h2>
+            ${shop}
+        </h2>
+
+        <h3>
+            Invoice and Warranty Details
+        </h3>
+
+        <p>
+            Hello ${name},
+        </p>
+
+        <p>
+            Your invoice has been generated successfully.
+        </p>
+
+        <p>
+            <strong>Invoice Number:</strong> ${invoice}<br>
+            <strong>Amount:</strong> ₹${total}
+        </p>
+
+        <p>
+            <strong>Warranty:</strong><br>
+            ${warranty}
+        </p>
+
+        <p>
+            Please keep this email for your records.
+        </p>
+
+        <p>
+            Thank you,<br>
+            ${shop}
+        </p>
+
+    `);
+
+    const text = `
+Hello ${customerName || 'Customer'},
+
+Your invoice has been generated successfully.
+
+Invoice Number: ${invoiceNumber || 'N/A'}
+Amount: ₹${total}
+
+Warranty:
+${warrantyDetails || 'Warranty details are available from the shop.'}
+
+Please keep this email for your records.
+
+Thank you,
+${shopName}
+
+Phone: 9922777092
+Email: swamisamarthsshop@gmail.com
+`;
+
+    return sendEmail({
+
+        to: customerEmail,
+
+        subject:
+            `Invoice ${invoiceNumber || ''}`.trim(),
+
+        html,
+
+        text
+
+    });
+}
+
+
+// --------------------------------------------------
+// Exports
+// --------------------------------------------------
+
 module.exports = {
+
     sendEmail,
+
+    sendRepairRegistrationEmail,
+
     sendRepairNotification,
-    sendOrderConfirmationEmail
+
+    sendOrderConfirmationEmail,
+
+    sendWarrantyInvoiceEmail
+
 };
