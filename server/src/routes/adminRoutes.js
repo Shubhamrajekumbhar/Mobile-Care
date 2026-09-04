@@ -1423,177 +1423,224 @@ router.post('/sales', authenticateAdmin, async (req, res) => {
        ONLY FOR WARRANTY SALES
     ========================================= */
 
-    if (
-      warranty &&
-      customerEmail
-    ) {
+   /* =========================================
+   SEND SALE INVOICE / WARRANTY EMAIL
+========================================= */
 
-      try {
+if (customerEmail) {
+  try {
 
-        /* -----------------------------------------
-           SHOP INFO
-        ----------------------------------------- */
+    const shopResult = await pool.query(`
+      SELECT
+        shop_name,
+        address,
+        contact_number,
+        email,
+        shop_timing
+      FROM shop_info
+      ORDER BY id
+      LIMIT 1
+    `);
 
-        const shopResult =
-          await pool.query(
-            `SELECT
-               shop_name,
-               address,
-               contact_number,
-               email,
-               shop_timing
-             FROM shop_info
-             ORDER BY id
-             LIMIT 1`
-          );
+    const shop = shopResult.rows[0] || {};
 
-        const shop =
-          shopResult.rows[0] || {};
+    const shopName =
+      shop.shop_name || 'Mobile Care';
 
-        const shopName =
-          shop.shop_name ||
-          'Mobile Care';
+    const shopAddress =
+      shop.address || '';
 
-        const shopAddress =
-          shop.address || '';
+    const shopContact =
+      shop.contact_number || '';
 
-        const shopContact =
-          shop.contact_number || '';
+    const shopEmail =
+      shop.email || '';
 
-        const shopEmail =
-          shop.email || '';
+    const shopTiming =
+      shop.shop_timing || '';
 
-        const shopTiming =
-          shop.shop_timing || '';
+    const invoiceNumber =
+      `SALE-${sale.id}`;
 
+    const saleDate =
+      new Date(sale.sale_date)
+        .toLocaleDateString('en-IN');
 
-        /* -----------------------------------------
-           FORMAT ITEMS
-        ----------------------------------------- */
+    const safeCustomerName =
+      finalCustomerName || 'Customer';
 
-        const itemRows =
-          items.map(item => {
+    const itemRows = (items || []).map(item => {
 
-            const quantity =
-              Number(item.quantity || 0);
+      const productName =
+        item.productName ||
+        item.product_name ||
+        'Product';
 
-            const unitPrice =
-              Number(item.unitPrice || 0);
+      const quantity =
+        Number(item.quantity || 0);
 
-            const totalPrice =
-              Number(item.totalPrice || 0);
+      const unitPrice =
+        Number(item.unitPrice || 0);
 
-            return `
-              <tr>
-                <td style="
-                  padding:12px;
-                  border-bottom:1px solid #e5e7eb;
-                ">
-                  ${item.productName || 'Product'}
-                </td>
+      const totalPrice =
+        Number(item.totalPrice || 0);
 
-                <td style="
-                  padding:12px;
-                  text-align:center;
-                  border-bottom:1px solid #e5e7eb;
-                ">
-                  ${quantity}
-                </td>
+      return `
+        <tr>
+          <td style="
+            padding:10px;
+            border-bottom:1px solid #e5e7eb;
+          ">
+            ${productName}
+          </td>
 
-                <td style="
-                  padding:12px;
-                  text-align:right;
-                  border-bottom:1px solid #e5e7eb;
-                ">
-                  ₹${unitPrice.toFixed(2)}
-                </td>
+          <td style="
+            padding:10px;
+            text-align:center;
+            border-bottom:1px solid #e5e7eb;
+          ">
+            ${quantity}
+          </td>
 
-                <td style="
-                  padding:12px;
-                  text-align:right;
-                  border-bottom:1px solid #e5e7eb;
-                ">
-                  ₹${totalPrice.toFixed(2)}
-                </td>
-              </tr>
-            `;
-          }).join('');
+          <td style="
+            padding:10px;
+            text-align:right;
+            border-bottom:1px solid #e5e7eb;
+          ">
+            ₹${unitPrice.toFixed(2)}
+          </td>
 
+          <td style="
+            padding:10px;
+            text-align:right;
+            border-bottom:1px solid #e5e7eb;
+          ">
+            ₹${totalPrice.toFixed(2)}
+          </td>
+        </tr>
+      `;
 
-        /* -----------------------------------------
-           WARRANTY DATES
-        ----------------------------------------- */
+    }).join('');
 
-        const warrantyStart =
-          new Date(
-            warranty.warranty_start_date
-          );
+    let warrantySection = '';
 
-        const warrantyEnd =
-          new Date(
-            warranty.warranty_end_date
-          );
+    let warrantyText = '';
 
-        const formatDate =
-          date =>
-            date.toLocaleDateString(
-              'en-IN',
-              {
-                day: '2-digit',
-                month: 'short',
-                year: 'numeric'
-              }
-            );
+    if (warranty) {
 
+      const warrantyStart =
+        warranty.warranty_start_date
+          ? new Date(warranty.warranty_start_date)
+          : null;
 
-        const invoiceNumber =
-          `SALE-${sale.id}`;
+      const warrantyEnd =
+        warranty.warranty_end_date
+          ? new Date(warranty.warranty_end_date)
+          : null;
 
+      const formatDate = date =>
+        date
+          ? date.toLocaleDateString('en-IN', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric'
+            })
+          : 'N/A';
 
-        /* -----------------------------------------
-           EMAIL
-        ----------------------------------------- */
+      warrantySection = `
+        <div style="
+          margin-top:20px;
+          padding:18px;
+          background:#f0fdf4;
+          border:1px solid #bbf7d0;
+          border-radius:10px;
+        ">
 
-        await sendEmail({
+          <h3 style="
+            margin-top:0;
+            color:#15803d;
+          ">
+            Warranty Details
+          </h3>
 
-          to: customerEmail,
+          <p>
+            <strong>Duration:</strong>
+            ${warrantyDuration || 0} months
+          </p>
 
-          subject:
-            `${shopName} - Invoice ${invoiceNumber} & Warranty Details`,
+          <p>
+            <strong>Start Date:</strong>
+            ${formatDate(warrantyStart)}
+          </p>
 
-          text: `
+          <p>
+            <strong>End Date:</strong>
+            ${formatDate(warrantyEnd)}
+          </p>
+
+          <p>
+            <strong>Status:</strong>
+            Active
+          </p>
+
+        </div>
+      `;
+
+      warrantyText = `
+
+WARRANTY
+--------------------------------
+Duration: ${warrantyDuration || 0} months
+Start Date: ${formatDate(warrantyStart)}
+End Date: ${formatDate(warrantyEnd)}
+Status: Active
+`;
+
+    }
+
+    const emailText = `
 ${shopName}
 
-Hello ${finalCustomerName},
+Hello ${safeCustomerName},
 
 Thank you for your purchase.
+
+Your purchase has been successfully recorded.
 
 INVOICE
 --------------------------------
 Invoice Number: ${invoiceNumber}
-Sale Date: ${new Date(
-  sale.sale_date
-).toLocaleDateString('en-IN')}
+Date: ${saleDate}
 
-${items.map(item =>
-`${item.productName}
-Quantity: ${Number(item.quantity || 0)}
-Unit Price: ₹${Number(item.unitPrice || 0).toFixed(2)}
-Total: ₹${Number(item.totalPrice || 0).toFixed(2)}
-`
-).join('\n')}
+${(items || []).map(item => {
 
-Subtotal: ₹${subtotal.toFixed(2)}
-Discount: ₹${discountAmount.toFixed(2)}
-Grand Total: ₹${saleTotal.toFixed(2)}
-Payment Method: ${paymentMethod}
+  const productName =
+    item.productName ||
+    item.product_name ||
+    'Product';
 
-WARRANTY
---------------------------------
-Duration: ${warrantyDuration} months
-Warranty Start: ${formatDate(warrantyStart)}
-Warranty End: ${formatDate(warrantyEnd)}
-Status: Active
+  const quantity =
+    Number(item.quantity || 0);
+
+  const unitPrice =
+    Number(item.unitPrice || 0);
+
+  const totalPrice =
+    Number(item.totalPrice || 0);
+
+  return `${productName}
+Quantity: ${quantity}
+Unit Price: ₹${unitPrice.toFixed(2)}
+Total: ₹${totalPrice.toFixed(2)}
+`;
+
+}).join('\n')}
+
+Subtotal: ₹${Number(subtotal || 0).toFixed(2)}
+Discount: ₹${Number(discountAmount || 0).toFixed(2)}
+Grand Total: ₹${Number(saleTotal || 0).toFixed(2)}
+Payment Method: ${paymentMethod || 'N/A'}
+${warrantyText}
 
 Thank you for choosing ${shopName}.
 
@@ -1602,27 +1649,28 @@ ${shopAddress}
 Phone: ${shopContact}
 Email: ${shopEmail}
 Opening Hours: ${shopTiming}
-`,
+`;
 
-          html: `
+    const emailHtml = `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport"
+        content="width=device-width,initial-scale=1.0">
 </head>
 
 <body style="
   margin:0;
-  padding:0;
-  background:#f3f7fc;
+  padding:20px;
+  background:#f5f7fb;
   font-family:Arial,Helvetica,sans-serif;
-  color:#0f172a;
+  color:#172033;
 ">
 
 <table width="100%"
        cellpadding="0"
-       cellspacing="0"
-       style="padding:30px 10px;">
+       cellspacing="0">
 
 <tr>
 <td align="center">
@@ -1633,18 +1681,16 @@ Opening Hours: ${shopTiming}
        style="
          max-width:650px;
          background:#ffffff;
-         border-radius:16px;
+         border:1px solid #e5e7eb;
+         border-radius:10px;
          overflow:hidden;
-         border:1px solid #e2e8f0;
        ">
-
-<!-- HEADER -->
 
 <tr>
 <td style="
+  padding:22px;
   background:#1769e0;
   color:#ffffff;
-  padding:25px;
   text-align:center;
 ">
 
@@ -1652,50 +1698,42 @@ Opening Hours: ${shopTiming}
   ${shopName}
 </h2>
 
-<p style="
-  margin:8px 0 0;
-  color:#dbeafe;
-">
-  Invoice & Warranty Details
+<p style="margin:8px 0 0;">
+  Purchase Confirmation
 </p>
 
 </td>
 </tr>
 
-
-<!-- CONTENT -->
-
 <tr>
-<td style="padding:30px;">
+<td style="padding:25px;">
 
-<h2>
-  Thank you for your purchase! 🎉
+<h2 style="margin-top:0;">
+  Purchase Confirmation
 </h2>
 
 <p>
-  Hello <strong>${finalCustomerName}</strong>,
+  Hello <strong>${safeCustomerName}</strong>,
 </p>
 
-<p style="color:#64748b;">
-  Here are your purchase and warranty details.
+<p>
+  Thank you for your purchase.
+  Your transaction has been successfully recorded.
 </p>
-
-
-<!-- INVOICE -->
 
 <div style="
-  margin-top:25px;
-  padding:20px;
-  background:#f8fbff;
-  border:1px solid #dbe7f5;
-  border-radius:12px;
+  margin-top:20px;
+  padding:18px;
+  background:#f8fafc;
+  border:1px solid #e5e7eb;
+  border-radius:8px;
 ">
 
 <h3 style="
   margin-top:0;
   color:#1769e0;
 ">
-  Invoice
+  Invoice Details
 </h3>
 
 <p>
@@ -1705,68 +1743,40 @@ Opening Hours: ${shopTiming}
 
 <p>
   <strong>Date:</strong>
-  ${new Date(
-    sale.sale_date
-  ).toLocaleDateString('en-IN')}
+  ${saleDate}
 </p>
 
 <table width="100%"
        cellpadding="0"
        cellspacing="0"
-       style="
-         border-collapse:collapse;
-         margin-top:15px;
-       ">
+       style="border-collapse:collapse;">
 
-<thead>
+<tr style="background:#eef2f7;">
 
-<tr style="
-  background:#eef5ff;
-">
-
-<th style="
-  padding:12px;
-  text-align:left;
-">
+<th style="padding:10px;text-align:left;">
   Product
 </th>
 
-<th style="
-  padding:12px;
-  text-align:center;
-">
+<th style="padding:10px;text-align:center;">
   Qty
 </th>
 
-<th style="
-  padding:12px;
-  text-align:right;
-">
+<th style="padding:10px;text-align:right;">
   Price
 </th>
 
-<th style="
-  padding:12px;
-  text-align:right;
-">
+<th style="padding:10px;text-align:right;">
   Total
 </th>
 
 </tr>
 
-</thead>
-
-<tbody>
-
 ${itemRows}
-
-</tbody>
 
 </table>
 
-
 <div style="
-  margin-top:20px;
+  margin-top:18px;
   text-align:right;
   line-height:1.8;
 ">
@@ -1774,14 +1784,14 @@ ${itemRows}
 <div>
   Subtotal:
   <strong>
-    ₹${subtotal.toFixed(2)}
+    ₹${Number(subtotal || 0).toFixed(2)}
   </strong>
 </div>
 
 <div>
   Discount:
   <strong>
-    ₹${discountAmount.toFixed(2)}
+    ₹${Number(discountAmount || 0).toFixed(2)}
   </strong>
 </div>
 
@@ -1792,7 +1802,7 @@ ${itemRows}
 
 Grand Total:
 <strong>
-  ₹${saleTotal.toFixed(2)}
+  ₹${Number(saleTotal || 0).toFixed(2)}
 </strong>
 
 </div>
@@ -1800,7 +1810,7 @@ Grand Total:
 <div>
   Payment:
   <strong>
-    ${paymentMethod}
+    ${paymentMethod || 'N/A'}
   </strong>
 </div>
 
@@ -1808,67 +1818,24 @@ Grand Total:
 
 </div>
 
-
-<!-- WARRANTY -->
-
-<div style="
-  margin-top:20px;
-  padding:20px;
-  background:#f0fdf4;
-  border:1px solid #bbf7d0;
-  border-radius:12px;
-">
-
-<h3 style="
-  margin-top:0;
-  color:#15803d;
-">
-  Warranty Details 🛡️
-</h3>
-
-<p>
-  <strong>Duration:</strong>
-  ${warrantyDuration} months
-</p>
-
-<p>
-  <strong>Start Date:</strong>
-  ${formatDate(warrantyStart)}
-</p>
-
-<p>
-  <strong>End Date:</strong>
-  ${formatDate(warrantyEnd)}
-</p>
-
-<p>
-  <strong>Status:</strong>
-  Active
-</p>
-
-</div>
-
+${warrantySection}
 
 <p style="
   margin-top:25px;
   color:#64748b;
 ">
 
-Please keep this email for your records
-and warranty reference.
+Please keep this email for your records.
 
 </p>
 
 </td>
 </tr>
 
-
-<!-- FOOTER -->
-
 <tr>
 <td style="
+  padding:20px;
   background:#f8fafc;
-  padding:22px;
   text-align:center;
   color:#64748b;
   font-size:12px;
@@ -1884,19 +1851,19 @@ ${shopAddress}
 
 <br>
 
-📞 ${shopContact}
+Phone: ${shopContact}
 
 <br>
 
-✉ ${shopEmail}
+Email: ${shopEmail}
 
 <br>
 
-🕐 ${shopTiming}
+${shopTiming}
 
 <br><br>
 
-Thank you for choosing ${shopName} ❤️
+Thank you for choosing ${shopName}.
 
 </td>
 </tr>
@@ -1910,488 +1877,33 @@ Thank you for choosing ${shopName} ❤️
 
 </body>
 </html>
-`
+`;
 
-        });
+    await sendEmail({
+      to: customerEmail,
 
-        console.log(
-          `Warranty invoice email sent to ${customerEmail}`
-        );
+      subject:
+        `${shopName} - Purchase Confirmation ${invoiceNumber}`,
 
-      } catch (emailError) {
+      html: emailHtml,
 
-        console.error(
-          'Warranty invoice email failed:',
-          emailError
-        );
-
-        // IMPORTANT:
-        // Sale remains successful even if email fails.
-      }
-    }
-
-
-    /* =========================================
-       RETURN SALE
-    ========================================= */
-
-    res.status(201).json({
-      ...sale,
-      warranty
+      text: emailText
     });
 
+    console.log(
+      `✅ Sale invoice email sent to ${customerEmail}`
+    );
 
-  } catch (error) {
+  } catch (emailError) {
 
     console.error(
-      'Sale creation error:',
-      error
+      '❌ Sale invoice email failed:',
+      emailError.message
     );
 
-    res.status(500).json({
-      message:
-        'Failed to create sale record.'
-    });
-
+    // Do NOT fail the sale if email fails.
   }
-
-});
-router.delete('/sales/:id', authenticateAdmin, async (req, res) => {
-  const client = await pool.connect();
-
-  try {
-    const saleId = Number(req.params.id);
-
-    if (!Number.isInteger(saleId) || saleId <= 0) {
-      return res.status(400).json({
-        message: 'Invalid sale ID.'
-      });
-    }
-
-    await client.query('BEGIN');
-
-    // Get sold items so their quantities can be returned to inventory
-    const itemsResult = await client.query(
-      `SELECT product_id, quantity
-       FROM sale_items
-       WHERE sale_id = $1`,
-      [saleId]
-    );
-
-    // Check that the sale exists
-    const saleResult = await client.query(
-      `SELECT id
-       FROM sales
-       WHERE id = $1`,
-      [saleId]
-    );
-
-    if (saleResult.rowCount === 0) {
-      await client.query('ROLLBACK');
-
-      return res.status(404).json({
-        message: 'Sale not found.'
-      });
-    }
-
-    // Return sold quantities to inventory
-    for (const item of itemsResult.rows) {
-      if (item.product_id) {
-        await client.query(
-          `UPDATE inventory
-           SET quantity = quantity + $1,
-               updated_at = NOW()
-           WHERE id = $2`,
-          [item.quantity, item.product_id]
-        );
-      }
-    }
-
-    // Delete the sale
-    // sale_items and warranties are configured with ON DELETE CASCADE
-    await client.query(
-      `DELETE FROM sales
-       WHERE id = $1`,
-      [saleId]
-    );
-
-    await client.query('COMMIT');
-
-    res.json({
-      success: true,
-      message: 'Sale deleted successfully.'
-    });
-
-  } catch (error) {
-
-    await client.query('ROLLBACK');
-
-    console.error('Delete sale error:', error);
-
-    res.status(500).json({
-      message: 'Failed to delete sale.'
-    });
-
-  } finally {
-    client.release();
-  }
-});
-
-router.get('/online-orders', authenticateAdmin, async (req, res) => {
-  try {
-    const result = await pool.query(`
-      SELECT o.*, COALESCE(json_agg(json_build_object(
-        'productId', i.product_id,
-        'productName', i.product_name,
-        'quantity', i.quantity,
-        'unitPrice', i.unit_price,
-        'totalPrice', i.total_price
-      ) ORDER BY i.id) FILTER (WHERE i.id IS NOT NULL), '[]') AS items
-      FROM online_orders o
-      LEFT JOIN online_order_items i ON i.order_id = o.id
-      GROUP BY o.id
-      ORDER BY o.created_at DESC`);
-    res.json(result.rows);
-  } catch (error) {
-    console.error('Online orders fetch error:', error);
-    res.status(500).json({ message: 'Failed to load online orders.' });
-  }
-});
-
-router.put('/online-orders/:id/status', authenticateAdmin, async (req, res) => {
-  const allowed = [
-    'Placed',
-    'Confirmed',
-    'Packed',
-    'Shipped',
-    'Delivered',
-    'Cancelled'
-  ];
-
-  const { status } = req.body;
-
-  if (!allowed.includes(status)) {
-    return res.status(400).json({
-      message: 'Invalid order status.'
-    });
-  }
-
-  try {
-    const result = await pool.query(
-      `UPDATE online_orders
-       SET order_status = $1,
-           updated_at = NOW()
-       WHERE id = $2
-       RETURNING *`,
-      [status, req.params.id]
-    );
-
-    if (!result.rowCount) {
-      return res.status(404).json({
-        message: 'Order not found.'
-      });
-    }
-
-    const order = result.rows[0];
-
-    // ==========================================
-    // SEND ORDER STATUS EMAIL
-    // ==========================================
-
-    if (order.customer_email) {
-
-      try {
-
-        const trackingUrl =
-          `${process.env.APP_URL}/order-track.html`;
-          const shopResult = await pool.query(
-  `SELECT shop_name, contact_number
-   FROM shop_info
-   ORDER BY id
-   LIMIT 1`
-);
-
-const shop = shopResult.rows[0] || {};
-
-const shopName = shop.shop_name || 'Mobile Care';
-const shopContact = shop.contact_number || '';
-
-        await sendEmail({
-          to: order.customer_email,
-
-          subject:
-            `Order Update - ${order.order_number}`,
-
-          html: `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport"
-        content="width=device-width, initial-scale=1.0">
-  <title>Mobile Care Order Update</title>
-</head>
-
-<body style="
-  margin:0;
-  padding:0;
-  background:#f3f7fc;
-  font-family:Arial,Helvetica,sans-serif;
-  color:#0f172a;
-">
-
-<table width="100%"
-       cellpadding="0"
-       cellspacing="0"
-       style="padding:30px 10px;background:#f3f7fc;">
-
-<tr>
-<td align="center">
-
-<table width="100%"
-       cellpadding="0"
-       cellspacing="0"
-       style="
-         max-width:620px;
-         background:#ffffff;
-         border-radius:18px;
-         overflow:hidden;
-         box-shadow:0 10px 35px rgba(15,23,42,.08);
-       ">
-
-<!-- HEADER -->
-
-<tr>
-<td style="
-  background:#1769e0;
-  padding:28px 30px;
-  text-align:center;
-">
-
-<div style="
-  color:#ffffff;
-  font-size:24px;
-  font-weight:800;
-">
-  <h2>${shopName}</h2>
-</div>
-
-<div style="
-  color:#dbeafe;
-  font-size:13px;
-  margin-top:7px;
-">
-  Order Status Update
-</div>
-
-</td>
-</tr>
-
-
-<!-- CONTENT -->
-
-<tr>
-<td style="padding:30px;">
-
-<h2 style="
-  margin:0 0 12px;
-  font-size:24px;
-">
-  Your order has been updated 📦
-</h2>
-
-<p style="
-  color:#475569;
-  font-size:15px;
-  line-height:1.6;
-">
-  Hello
-  <strong>
-    ${order.customer_name || 'Customer'}
-  </strong>
-  👋
-</p>
-
-<p style="
-  color:#64748b;
-  font-size:14px;
-  line-height:1.6;
-">
-  There is an update regarding your
-  Mobile Care order.
-</p>
-
-
-<!-- ORDER CARD -->
-
-<div style="
-  margin:22px 0;
-  padding:20px;
-  background:#f8fbff;
-  border:1px solid #dce7f7;
-  border-radius:14px;
-">
-
-<div style="
-  color:#64748b;
-  font-size:11px;
-  text-transform:uppercase;
-  letter-spacing:.6px;
-">
-  Order Number
-</div>
-
-<div style="
-  margin-top:6px;
-  color:#1769e0;
-  font-size:17px;
-  font-weight:800;
-">
-  ${order.order_number}
-</div>
-
-<hr style="
-  border:0;
-  border-top:1px solid #e5eaf2;
-  margin:18px 0;
-">
-
-<div style="
-  color:#64748b;
-  font-size:11px;
-  text-transform:uppercase;
-">
-  Current Status
-</div>
-
-<div style="
-  margin-top:8px;
-  color:#1769e0;
-  font-size:20px;
-  font-weight:800;
-">
-  ${status}
-</div>
-
-</div>
-
-
-<!-- TRACK BUTTON -->
-
-<div style="
-  text-align:center;
-  margin:30px 0;
-">
-
-<a href="${trackingUrl}"
-   style="
-     display:inline-block;
-     background:#1769e0;
-     color:#ffffff;
-     text-decoration:none;
-     padding:14px 28px;
-     border-radius:11px;
-     font-size:15px;
-     font-weight:800;
-   ">
-  📦 TRACK YOUR ORDER
-</a>
-
-</div>
-
-<p style="text-align:center; margin-top:15px;">
-  📞 ${shopContact}
-</p>
-<p style="
-  color:#94a3b8;
-  font-size:12px;
-  text-align:center;
-  line-height:1.5;
-">
-  Click the button above to view your
-  latest order status.
-</p>
-
-</td>
-</tr>
-
-
-<!-- FOOTER -->
-
-<tr>
-<td style="
-  background:#f8fafc;
-  border-top:1px solid #e8edf5;
-  padding:24px 30px;
-  text-align:center;
-">
-
-<div style="
-  color:#1769e0;
-  font-size:15px;
-  font-weight:800;
-">
-  Mobile Care
-</div>
-
-<p style="
-  margin:7px 0;
-  color:#64748b;
-  font-size:12px;
-">
-  Thank you for choosing Mobile Care ❤️
-</p>
-
-<p style="
-  margin:0;
-  color:#94a3b8;
-  font-size:11px;
-">
-  This is an automated order status email.
-</p>
-
-</td>
-</tr>
-
-</table>
-
-</td>
-</tr>
-
-</table>
-
-</body>
-</html>
-`,
-
-          text: `
-MOBILE CARE - ORDER UPDATE
-
-Hello ${order.customer_name || 'Customer'},
-
-Your Mobile Care order has been updated.
-
-Order Number: ${order.order_number}
-
-Current Status: ${status}
-
-Track your order:
-${trackingUrl}
-
-Thank you for choosing Mobile Care.
-`
-        });
-
-      } catch (emailError) {
-
-        console.error(
-          'Order status email failed:',
-          emailError.message
-        );
-
-      }
-    }
-
+}
     // ==========================================
     // RETURN SUCCESS
     // ==========================================
